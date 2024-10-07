@@ -1,0 +1,1962 @@
+WEBVTT
+
+1
+00:00:05.310 --> 00:00:05.980
+Buddy.
+
+2
+00:00:07.320 --> 00:00:12.649
+GBM01 09FL Buckingham (X52): Been there twice. My God! Am I right in the way?
+
+3
+00:00:13.170 --> 00:00:14.917
+GBM01 09FL Buckingham (X52): Well, you're okay.
+
+4
+00:00:15.970 --> 00:00:18.060
+GBM01 09FL Buckingham (X52): Alright.
+
+5
+00:00:18.090 --> 00:00:20.210
+GBM01 09FL Buckingham (X52): alright! We'll get started.
+
+6
+00:00:21.232 --> 00:00:36.737
+GBM01 09FL Buckingham (X52): nice to meet you guys actually in person. I've talked to you multiple times. But yeah, Matt trainer, public experience manager data science team. I don't do it long to an instruction.
+
+7
+00:00:37.850 --> 00:00:41.400
+GBM01 09FL Buckingham (X52): The product team. So that person, Rick.
+
+8
+00:00:41.510 --> 00:00:46.570
+GBM01 09FL Buckingham (X52): yeah, a lot of the stuff that comes from approximate point rolls into my group.
+
+9
+00:00:46.911 --> 00:00:55.939
+GBM01 09FL Buckingham (X52): So if you guys have feedback on what you want to see in the products like how it could be better incorporated into your workload, we want to hear about it.
+
+10
+00:00:56.266 --> 00:01:00.689
+GBM01 09FL Buckingham (X52): Cause, especially with some of the people in the room. Like when you guys say it.
+
+11
+00:01:00.850 --> 00:01:05.890
+GBM01 09FL Buckingham (X52): you know it. It would see buying compared to like the license.
+
+12
+00:01:06.402 --> 00:01:18.359
+GBM01 09FL Buckingham (X52): and some of those are here just as a fly in the wall. Because I think I'm from retail to you once about the infrastructure that we're building for compute as a service.
+
+13
+00:01:18.450 --> 00:01:40.650
+GBM01 09FL Buckingham (X52): So kind of the future intention is, you know, things that these guys are designing and building could also be delivered through the computer service that we're building. So even though we're not here, as Matt kind of goes through the experience, I'll be kind of curious to hear more about. You know your cloud workflows versus
+
+14
+00:01:41.448 --> 00:02:07.122
+GBM01 09FL Buckingham (X52): the on-prem. I think you run a lot of your work, maybe. Now, on the workstations that HP shifts to you. Right? So the things that we're building kind of and the cloud.
+
+15
+00:02:08.938 --> 00:02:20.651
+GBM01 09FL Buckingham (X52): yeah, so this really inform this is informal. And we just want to get some feedback for kind of like where we're at with product with AI studio right now, kind of like where we're going. Your guys impression of it.
+
+16
+00:02:20.950 --> 00:02:38.680
+GBM01 09FL Buckingham (X52): And so maybe before we do that, I think one of the things that we're trying to tease out a little bit right now is that we believe we know who we're kind of targeting as far as like our deal customer and whatnot. And so could. Maybe we could just kind of start. There is. Kind of let your guys where you're where.
+
+17
+00:02:38.680 --> 00:03:03.879
+GBM01 09FL Buckingham (X52): like, how we kinda you're using AI studio kind of what's your, I guess used cases for it. What's your team size and stuff like that? So maybe start with couple of those questions. Yes, maybe just starting with like in your guys, AI and machine machine learning workflows like, what does your team size? Kind of what does your collaborator team look like in your in your daily data, science life, I guess in your companies.
+
+18
+00:03:04.240 --> 00:03:09.699
+GBM01 09FL Buckingham (X52): Yeah, I have 3 teams at the moment the size varies between
+
+19
+00:03:10.030 --> 00:03:11.560
+GBM01 09FL Buckingham (X52): 8 12.
+
+20
+00:03:12.172 --> 00:03:16.097
+GBM01 09FL Buckingham (X52): And do the teams interact with each other and collaborate.
+
+21
+00:03:17.200 --> 00:03:18.919
+GBM01 09FL Buckingham (X52): Yes, that's always
+
+22
+00:03:18.960 --> 00:03:21.299
+GBM01 09FL Buckingham (X52): because we work in different
+
+23
+00:03:21.480 --> 00:03:26.969
+GBM01 09FL Buckingham (X52): for the algorithm spaces. But we when once one of us doing something they get in
+
+24
+00:03:26.980 --> 00:03:37.903
+GBM01 09FL Buckingham (X52): that fix the other groups. So we end up sinking each 2 weeks once. So you might kind of have of those 8 12, a few people working together time. But then, in certain instances where you need to collaborate calls.
+
+25
+00:03:38.230 --> 00:03:48.600
+GBM01 09FL Buckingham (X52): And then what type of what type of models is there, are you large language models? Or something? Yeah, we we're now.
+
+26
+00:03:48.990 --> 00:03:50.600
+GBM01 09FL Buckingham (X52): We never pushed the spectrum.
+
+27
+00:03:51.030 --> 00:03:52.140
+GBM01 09FL Buckingham (X52): We have.
+
+28
+00:03:52.350 --> 00:03:57.229
+GBM01 09FL Buckingham (X52): Video model is deep neural networks. And recently, we adopted the Lms, okay.
+
+29
+00:03:58.510 --> 00:04:03.027
+GBM01 09FL Buckingham (X52): the evidence is slightly running different at the moment. The company what we have
+
+30
+00:04:03.460 --> 00:04:11.580
+GBM01 09FL Buckingham (X52): an expert to grow a bunch of people from one team, from different teams with 1 1 working stream. But you could think about this
+
+31
+00:04:11.870 --> 00:04:14.550
+GBM01 09FL Buckingham (X52): another just email, yeah, okay.
+
+32
+00:04:15.568 --> 00:04:22.520
+GBM01 09FL Buckingham (X52): yeah. On on my company. Since we are like a platform company, this is slightly different.
+
+33
+00:04:23.141 --> 00:04:30.769
+GBM01 09FL Buckingham (X52): I can maybe think of my previous company where we were like for traditional approach, because right now we are
+
+34
+00:04:30.790 --> 00:04:36.620
+GBM01 09FL Buckingham (X52): working with other companies to bring passenger's use cases
+
+35
+00:04:36.770 --> 00:04:38.829
+GBM01 09FL Buckingham (X52): live using the top one.
+
+36
+00:04:39.080 --> 00:04:43.290
+GBM01 09FL Buckingham (X52): So we are like small teams like 3 to 4 people only.
+
+37
+00:04:43.640 --> 00:04:58.079
+GBM01 09FL Buckingham (X52): And we, we can like data from the customer and moving the Poc in the platform. So it's not like really good fit with this kind of of platform, so I can't think of my previous company, which is fine.
+
+38
+00:04:58.150 --> 00:05:03.530
+GBM01 09FL Buckingham (X52): So in Colorado, which was an insurance company, we were a team of 5
+
+39
+00:05:03.610 --> 00:05:17.480
+GBM01 09FL Buckingham (X52): and we were building. We were like a transversal, a lot of like team. So we work basically from the whole company together. Listen. Some different business clients were asking us for a product.
+
+40
+00:05:17.570 --> 00:05:20.979
+GBM01 09FL Buckingham (X52): for for for products, for for different months
+
+41
+00:05:21.504 --> 00:05:26.720
+GBM01 09FL Buckingham (X52): so we basically collaborated together to build them or
+
+42
+00:05:26.770 --> 00:05:40.870
+GBM01 09FL Buckingham (X52): individually like since since we were getting work from different speeds. We also like to speak the work, of course. So I work with a small commercial team now, and you work with, all the different business team.
+
+43
+00:05:42.420 --> 00:05:45.829
+GBM01 09FL Buckingham (X52): From that point of view the interaction was
+
+44
+00:05:45.930 --> 00:05:48.329
+GBM01 09FL Buckingham (X52): quite heavy when moving to production.
+
+45
+00:05:48.720 --> 00:06:05.329
+GBM01 09FL Buckingham (X52): because we can develop like different models in the end. The way we put them into production should be the same. So we can maintain them easily. I see. Okay, so you might do all the development kind of separately. But then, when you get to that production part, that's when you're really kind of sharing exactly, exactly
+
+46
+00:06:05.350 --> 00:06:13.049
+GBM01 09FL Buckingham (X52): potentially, the way we develop the model is similar, because, like you, you know, if you're within a list or in a churn model. And
+
+47
+00:06:13.100 --> 00:06:25.110
+GBM01 09FL Buckingham (X52): all of this kind of traditional models. They are pretty similar between them in terms of how to build them so potentially that building process might be similar as well. But data is something different.
+
+48
+00:06:25.300 --> 00:06:33.519
+GBM01 09FL Buckingham (X52): And but definitely where, where we are all together is moving to production. Because we, we have, like a common interface. And Api that we need to build.
+
+49
+00:06:33.930 --> 00:06:35.040
+GBM01 09FL Buckingham (X52): Yeah. But
+
+50
+00:06:35.600 --> 00:06:37.299
+GBM01 09FL Buckingham (X52): all the models should be
+
+51
+00:06:37.560 --> 00:06:41.645
+GBM01 09FL Buckingham (X52): in production the same way. So we can maintain that meeting, you know.
+
+52
+00:06:43.640 --> 00:06:58.499
+GBM01 09FL Buckingham (X52): where would how would you guys consider within your own companies your ability to be able to pick the tools that you want and then potentially be able to purchase them. Do you kind of have a high influence to say I want this. We need to go buy it, or kind of a low influence on that.
+
+53
+00:06:59.564 --> 00:07:13.775
+GBM01 09FL Buckingham (X52): In my company, thinking on the previous one again. Since the data scientist team was, it was a startup at the beginning and both acquired by by air, the Us.
+
+54
+00:07:14.280 --> 00:07:23.200
+GBM01 09FL Buckingham (X52): But since since we were coming from Startup environment, we had a lot of decision power on on. We didn't have the budget.
+
+55
+00:07:23.250 --> 00:07:33.870
+GBM01 09FL Buckingham (X52): but we were not about the owners. But we have the decision proper. For example, in our case we were looking for different platforms to move them most to production, testing them.
+
+56
+00:07:33.970 --> 00:07:37.200
+GBM01 09FL Buckingham (X52): and like doing some small cases ourselves with them.
+
+57
+00:07:37.290 --> 00:07:53.280
+GBM01 09FL Buckingham (X52): and deciding ourselves which one we we prefer to to buy. And the the by process is on a different side. But in our case is the company. He was like, 5, 6 people only. We were deciding ourselves. Okay.
+
+58
+00:07:53.540 --> 00:08:08.330
+GBM01 09FL Buckingham (X52): makes sense. Yeah, so we have a lot for deciding the tool. But contracting and budget and stuff now is more like you have to follow up in office. When I joined was.
+
+59
+00:08:08.470 --> 00:08:13.695
+GBM01 09FL Buckingham (X52): actually my Pb has a code, or we want this, it just it is the code.
+
+60
+00:08:14.830 --> 00:08:18.109
+GBM01 09FL Buckingham (X52): And now it's slightly different. Okay, so
+
+61
+00:08:18.876 --> 00:08:27.440
+GBM01 09FL Buckingham (X52): little bit different in the sense that it's just. It's a little bit more difficult to be able to and more difficult for multiple.
+
+62
+00:08:27.480 --> 00:08:41.449
+GBM01 09FL Buckingham (X52): I hate the term, but by good, more bureaucracy. We like you build the case. Even if you have the influence leadership period, you have to go with legal review stuff and security to review the tool.
+
+63
+00:08:41.620 --> 00:08:51.799
+GBM01 09FL Buckingham (X52): So there's not only the influence part, but then there's potentially the time it would take for you. Once you'd pick it, it would take a long time to potentially be able to get it
+
+64
+00:08:52.740 --> 00:08:55.449
+GBM01 09FL Buckingham (X52): like the view you're trying to get it in. And
+
+65
+00:08:55.610 --> 00:09:07.360
+GBM01 09FL Buckingham (X52): you ask yourself if you know the people to talk to and push it along a bit further. What I have seen is that. But of course, working on outgoing the tele company
+
+66
+00:09:07.853 --> 00:09:16.689
+GBM01 09FL Buckingham (X52): it was like much bigger company. And in terms of the the number of people working on data, I mean, and with when we.
+
+67
+00:09:16.770 --> 00:09:18.590
+GBM01 09FL Buckingham (X52): the companies, have wording.
+
+68
+00:09:18.610 --> 00:09:21.440
+GBM01 09FL Buckingham (X52): if they have multiple teams
+
+69
+00:09:21.810 --> 00:09:28.459
+GBM01 09FL Buckingham (X52): that they usually have like a high profile, which is deciding what's the whole company doing? But if
+
+70
+00:09:28.520 --> 00:09:35.949
+GBM01 09FL Buckingham (X52): the company has like only one team, if it's big or small. But if it's just one, usually decisions should
+
+71
+00:09:35.950 --> 00:09:58.529
+GBM01 09FL Buckingham (X52): will be more on the data science team. Yeah. So you're basically, you're saying that there's like one team. It's easy for them to just be able to say, this is what we want. But if there's multiple teams also process. You got to figure out to like, make sure each team. So they are usually not asking that much to different teams. So centralized versus centralized.
+
+72
+00:09:58.530 --> 00:10:06.959
+GBM01 09FL Buckingham (X52): Yeah, makes sense. Okay, so do all the teams have to use the same software. Yeah. And I wasn't at Orange. It was like already, like, Hey, I want to use this. No.
+
+73
+00:10:07.020 --> 00:10:09.680
+GBM01 09FL Buckingham (X52): you have this framework. Yeah. So so
+
+74
+00:10:10.040 --> 00:10:10.880
+GBM01 09FL Buckingham (X52): so
+
+75
+00:10:11.040 --> 00:10:28.015
+GBM01 09FL Buckingham (X52): didn't have make any decision at Orange, for example, makes sense just for time's sake I was gonna have some part of feedback questions unless we want to ask about the the brain, their AI readiness. So I think one of the things that we're trying to figure out is
+
+76
+00:10:29.385 --> 00:10:54.550
+GBM01 09FL Buckingham (X52): usefulness, I guess. Usefulness and readiness of the product for for the manager. Right? So I guess where the questions I'd like to ask are around. I guess your experience with AI studio. And specifically, we'll start with this one. Okay, alright, are you able to integrate AI studio into your workflows today? Given your experience with products in in Michael Vinny.
+
+77
+00:10:54.680 --> 00:10:55.990
+GBM01 09FL Buckingham (X52): who yes.
+
+78
+00:10:57.165 --> 00:11:05.032
+GBM01 09FL Buckingham (X52): ignore, ignoring how difficult it might be able to purchase if you have it. The short close the short answer is no,
+
+79
+00:11:05.660 --> 00:11:12.560
+GBM01 09FL Buckingham (X52): 2 parts one, there is a lot of like control features that doesn't have access and single sign on, and
+
+80
+00:11:12.690 --> 00:11:26.140
+GBM01 09FL Buckingham (X52): they have to try to make them in my company. I told we dig so that's I created the call quality of it the billing stuff they want usually somewhat to oversee open notifications.
+
+81
+00:11:26.210 --> 00:11:27.210
+GBM01 09FL Buckingham (X52): one things
+
+82
+00:11:27.760 --> 00:11:29.290
+GBM01 09FL Buckingham (X52): and managing good.
+
+83
+00:11:29.490 --> 00:11:40.446
+GBM01 09FL Buckingham (X52): Maybe all the keys of licensing some sort of that. So those are so. Those are kind of like features that are missing. Right? You need single sign on. You need that. Yeah, what about? From a functionality standpoint?
+
+84
+00:11:42.254 --> 00:12:05.190
+GBM01 09FL Buckingham (X52): from functionality standpoint. I have one feedback, since since they they call from the beginning like how you? So the goal is in the repository. So we relay with how, for example, to have the the call updated, and so on. I think relaying on these hub is good.
+
+85
+00:12:05.520 --> 00:12:10.009
+GBM01 09FL Buckingham (X52): but at the same. So if you are using the platform, what you are expecting is
+
+86
+00:12:10.100 --> 00:12:17.569
+GBM01 09FL Buckingham (X52): at some way the platform to to do the thing for you. So even if you have like behind the scenes you have.
+
+87
+00:12:18.390 --> 00:12:22.290
+GBM01 09FL Buckingham (X52): I would expect to be able to control that from the
+
+88
+00:12:22.360 --> 00:12:34.099
+GBM01 09FL Buckingham (X52): from the platform to be able to push, and both, and then, with a very seamless process, like like when you, when you have a remote server, you connect, and it's always there updated, you know.
+
+89
+00:12:35.520 --> 00:12:55.229
+GBM01 09FL Buckingham (X52): you do that with within it, and and also the the way the folder structure works. But that's not that important. But it's also a bit intuitive to me. Yeah. But yeah, because it's not clear, like where where the folder is, and that folder is persistent or not. It's a bit intuitive. That's not like
+
+90
+00:12:55.230 --> 00:13:06.140
+GBM01 09FL Buckingham (X52): big deal. I mean, I think it's yeah, but from from the Portland push. For me it should be like a seamless process inside the platform.
+
+91
+00:13:06.802 --> 00:13:14.879
+GBM01 09FL Buckingham (X52): I, I understand, make sense for me to have it like really in the happy head of the scenes, but it should be like seamless to the user in my personal.
+
+92
+00:13:15.050 --> 00:13:16.930
+GBM01 09FL Buckingham (X52): is there someone that does that well
+
+93
+00:13:18.910 --> 00:13:20.040
+GBM01 09FL Buckingham (X52): of?
+
+94
+00:13:20.140 --> 00:13:34.800
+GBM01 09FL Buckingham (X52): Not really. Because, for example, I am a user of pi charm, which is another tool, and in by charm you need to do that manually. So it's not like they are doing in the way I'm expecting AI to do it so, but
+
+95
+00:13:36.460 --> 00:13:38.760
+GBM01 09FL Buckingham (X52): I don't know. Mostly if they hang up on
+
+96
+00:13:39.020 --> 00:14:04.600
+GBM01 09FL Buckingham (X52): but I think for for me, like some functionalities, would work the other function. Like the collaboration working on this, the things will work immediately. But we have developed our own deployment tools and our own like pipeline tools, and I don't know how to move these up studio. So in other words.
+
+97
+00:14:04.630 --> 00:14:18.562
+GBM01 09FL Buckingham (X52): even if you were able to get through all of your like training and everything. When you get to that final step of deployment, then there's a lack. Yeah, you have to take it out of AI studio in order to put it into whatever. Yeah. And like, it's not just specific
+
+98
+00:14:19.480 --> 00:14:25.810
+GBM01 09FL Buckingham (X52): for us any other tool, because we just built our own platforms to do deployment and training. And
+
+99
+00:14:25.870 --> 00:14:28.250
+GBM01 09FL Buckingham (X52): I don't think we need to look
+
+100
+00:14:28.290 --> 00:14:31.830
+GBM01 09FL Buckingham (X52): to somehow benefit. Okay, how would you want it next?
+
+101
+00:14:33.040 --> 00:14:38.740
+GBM01 09FL Buckingham (X52): I didn't give it much myself, as well. See, this would be easier. But we're used to
+
+102
+00:14:39.650 --> 00:14:45.540
+GBM01 09FL Buckingham (X52): at the moment we're used to like, yeah, you prepare this file, you push it, and then some other. Next the next 2 will pick it up
+
+103
+00:14:45.670 --> 00:14:53.420
+GBM01 09FL Buckingham (X52): from the config. If it's the same process, at least they will accept. Yeah, it's just what we do with this buff
+
+104
+00:14:53.560 --> 00:15:01.229
+GBM01 09FL Buckingham (X52): common that have your like homegrown pipelines like for other companies? Or is that usually more unique to
+
+105
+00:15:01.510 --> 00:15:12.593
+GBM01 09FL Buckingham (X52): can you say that again? So, like you said you developed all these kind of homegrown with what pipelines I think that's unique to your company or fairly standard practice across
+
+106
+00:15:13.160 --> 00:15:15.090
+GBM01 09FL Buckingham (X52): I don't.
+
+107
+00:15:15.900 --> 00:15:29.672
+GBM01 09FL Buckingham (X52): My company is still is that we, when we started doing this, there was not much out there, so we and we just stuck a way now which is maintaining them, and the cost of just switching back is a lot
+
+108
+00:15:30.420 --> 00:15:48.090
+GBM01 09FL Buckingham (X52): I think, small upstapt. They just do whatever. Well, I think. Hello, companies. I got one last question. So I wanted to double click on that. So it sounds like, I don't want to alert you guys now, but you're relatively
+
+109
+00:15:48.110 --> 00:16:06.489
+GBM01 09FL Buckingham (X52): immature when it comes to your workflows. It sounds like you have tools, you have tools to do your deployments. You have tools available right now. You're there's not like gaps in your workflow that you're necessarily looking to fix. I'm not thinking about like the switching you already have a process that you or do you think that that's pretty immature. Your your processes
+
+110
+00:16:07.350 --> 00:16:32.729
+GBM01 09FL Buckingham (X52): like for for me, my current companies, due to the whole company works, is not like there's no possible rights on the previous company it could fit, because our workflow was also like an internal process we have, we built around it was everything like pre manual. So having found something to centralize development could fit. Well.
+
+111
+00:16:34.900 --> 00:16:36.700
+GBM01 09FL Buckingham (X52): if I'm
+
+112
+00:16:37.725 --> 00:17:04.874
+GBM01 09FL Buckingham (X52): even if our tools are maturing with all the services. But we changed our pipelining that does this for us. We have a team that does
+
+113
+00:17:05.880 --> 00:17:12.480
+GBM01 09FL Buckingham (X52): the only thing that they look at. Also, I think you could do the only thing that looks like when we keep going with it. We need to make sure.
+
+114
+00:17:12.690 --> 00:17:21.980
+GBM01 09FL Buckingham (X52): Also, the engineering can put their own monitoring and couldn't do that at all. Can we be able to do that. But I haven't done that a lot with.
+
+115
+00:17:22.260 --> 00:17:34.188
+GBM01 09FL Buckingham (X52): okay? Alright, this one really quick. I got like 20 more questions. But
+
+116
+00:17:35.340 --> 00:17:37.909
+GBM01 09FL Buckingham (X52): yeah, you basically windows. Yeah. 3
+
+117
+00:17:37.930 --> 00:17:41.490
+GBM01 09FL Buckingham (X52): really involvement with things. Yeah, thanks. Anyways.
+
+118
+00:18:12.030 --> 00:18:14.507
+GBM01 09FL Buckingham (X52): our questions in then, yeah, okay.
+
+119
+00:18:15.300 --> 00:18:37.240
+GBM01 09FL Buckingham (X52): yeah, maybe we'll skip kind of the larger introduction. Basically, there's 2 people you need to care about in the room right now. This trainer here, who leads our kind of customer experience group or product, and then myself team everyone else is just flies on the wall. And like they're not here, they're not important people. Yeah.
+
+120
+00:18:37.270 --> 00:18:48.128
+GBM01 09FL Buckingham (X52): And so we asked to. We did a longer introduction last group. And then we ran at the top of that question. So we'll just like Jump right in. That's all. You guys. Alright. So
+
+121
+00:18:48.570 --> 00:19:07.330
+GBM01 09FL Buckingham (X52): what is your guys team size in your in your work and day to day yeah, with your team size that you collaborate with team size is around 12 to 1512 to 15. Okay, all working together. Or is it kind of smaller groups? Never mind, this is the smallest. That's the smallest group. Wow! That's a good.
+
+122
+00:19:07.330 --> 00:19:22.520
+GBM01 09FL Buckingham (X52): because it depends on like in the organization that I work depend on the categories that you work on. So chocolates or based, or something else. So each category has 12 of data sites.
+
+123
+00:19:23.358 --> 00:19:38.691
+GBM01 09FL Buckingham (X52): So right now, I'm in a team of 5 people. But only 2 are data scientists. And the last teams that I have been on the biggest one was 10 data scientists.
+
+124
+00:19:39.190 --> 00:19:46.638
+GBM01 09FL Buckingham (X52): 8, 10 data centers and the other one before that, it was like 5 or 6 data scientists.
+
+125
+00:19:48.930 --> 00:20:03.199
+GBM01 09FL Buckingham (X52): what would you kind of classify your kind of your workflows? Do you have premature processes and workflows through your data science or is, are you guys just kind of like figuring out as you go along and using open source tools? Or does that? Does that question, make sense like.
+
+126
+00:20:04.021 --> 00:20:11.570
+GBM01 09FL Buckingham (X52): do you have a pretty defined set of tools and processes and workflows? Or or
+
+127
+00:20:11.570 --> 00:20:36.380
+GBM01 09FL Buckingham (X52): the count is around maturity like, because kind of just get started figuring out, or you have a producer majority of them. We kick start. And then we figured it out because it depends on the clients. Requirements also, like they might need something different. So we need to retrain everything, and we need to fine tune the things according to their requests. But on an like, because we work on demand forecasting.
+
+128
+00:20:36.380 --> 00:20:55.000
+GBM01 09FL Buckingham (X52): So a lot of the processes are streamlined. But then comes certain personalization of the clients helps me to reiterate the things for me depends on the clients we have. I have had clients with. When we worked on visual machines, and you know
+
+129
+00:20:55.650 --> 00:21:06.396
+GBM01 09FL Buckingham (X52): we were within their processes. That was banking system, and it was super super right? You couldn't do anything almost and we had clients where
+
+130
+00:21:07.030 --> 00:21:32.765
+GBM01 09FL Buckingham (X52): We started from a discovery process only discovery when we understand what the client wants, and then we understand their their system to do that, their data. And then from that we create the architecture. We have the an architecture brain that's coming to the table. Crazy architecture. We understand what they want to use. Some people use aws. I don't know. Some people use it, either. Stuff like that.
+
+131
+00:21:34.530 --> 00:21:36.160
+GBM01 09FL Buckingham (X52): do I do, I know.
+
+132
+00:21:36.560 --> 00:21:39.730
+GBM01 09FL Buckingham (X52): to mention the products or
+
+133
+00:21:39.840 --> 00:21:40.990
+GBM01 09FL Buckingham (X52): come?
+
+134
+00:21:41.070 --> 00:21:43.984
+GBM01 09FL Buckingham (X52): Yeah, it doesn't matter. Okay,
+
+135
+00:21:44.970 --> 00:22:14.410
+GBM01 09FL Buckingham (X52): yeah. So you usually, or is the other way around. And yeah, so it's either we are going with their systems or and then, as far as like, what types of models you guys are developing, you said, like large language models. Mesh predicted models. I think you mentioned like anything else, as far as types of models that we have
+
+136
+00:22:14.855 --> 00:22:21.980
+GBM01 09FL Buckingham (X52): geospatial, the satellite, imagery, and all those things. So it even starts from land, use classification right to.
+
+137
+00:22:22.020 --> 00:22:36.570
+GBM01 09FL Buckingham (X52): We are predicting what type of store types would be there in that area. So we have square images from the satellite. And we try to understand. Is it a residential area? Is it the industrial area? Given the density of buildings? We tried further understand
+
+138
+00:22:36.580 --> 00:22:54.815
+GBM01 09FL Buckingham (X52): the number of possible stores out there, the retail stores. And we've new. We fuse it with Google maps, data that the locations, the area of like, I would say, buys point of interest areas. We try to fuse it
+
+139
+00:22:55.420 --> 00:23:04.760
+GBM01 09FL Buckingham (X52): so, but not majorly. It depends on the ask of the granularity from the client if they are asking for too much granularity. We have to go for
+
+140
+00:23:04.890 --> 00:23:09.490
+GBM01 09FL Buckingham (X52): more and more data additions. Satellite immediately won't work
+
+141
+00:23:09.590 --> 00:23:10.850
+GBM01 09FL Buckingham (X52): individually.
+
+142
+00:23:11.240 --> 00:23:23.749
+GBM01 09FL Buckingham (X52): You you mentioned before. You don't like predicted model. So you're using all of this data to make predictions on the best place. For so one is the demand forecasting, and they also want to focus where should be tentative.
+
+143
+00:23:23.890 --> 00:23:49.509
+GBM01 09FL Buckingham (X52): like certain stores where they are still not existing. They want to increase their distributors to put their materials at the shelf of those stores. They try to figure it out. All this information goes to the manufacturing houses they then manufacture and send the materials to the distributors of that city.
+
+144
+00:23:49.710 --> 00:23:50.850
+GBM01 09FL Buckingham (X52): Totally tip
+
+145
+00:23:52.090 --> 00:24:12.250
+GBM01 09FL Buckingham (X52): yeah. For us has been Doc information instruction from documents. Matching any sort of string, matching like name matching or address message matching from pieces of data. So Matching have to be really, really fast.
+
+146
+00:24:13.880 --> 00:24:19.830
+GBM01 09FL Buckingham (X52): and document classification right now
+
+147
+00:24:21.120 --> 00:24:23.460
+GBM01 09FL Buckingham (X52): go ahead, Alex, on. Virtually.
+
+148
+00:24:25.320 --> 00:24:28.130
+GBM01 09FL Buckingham (X52): Caitlin. I guess we would be if
+
+149
+00:24:28.564 --> 00:24:47.109
+GBM01 09FL Buckingham (X52): we have 5 more minutes. No, if you need, if you need them. Is that okay? Alright. Maybe next set of questions is really more about AI studio. And you guys experience with it? I guess. Maybe simple question. Do you think that you'd be able to integrate AI studio into your workflows as it is today. Given your experience.
+
+150
+00:24:47.750 --> 00:25:01.129
+GBM01 09FL Buckingham (X52): I think this because it's easy to plug it, and I think it will be easier for all of us, because my team is a little larger 12 people. So I think we are in the good shape to fit it.
+
+151
+00:25:03.200 --> 00:25:11.549
+GBM01 09FL Buckingham (X52): let's let's double click on that. And then also, I know you gotta go. So let's get your feedback. Yeah. So what? I guess, what's the differentiator?
+
+152
+00:25:11.920 --> 00:25:15.260
+GBM01 09FL Buckingham (X52): Would you? Okay, maybe let me rephrase the question, would you want to
+
+153
+00:25:15.340 --> 00:25:24.299
+GBM01 09FL Buckingham (X52): integrate AI studio into your workflows today? Given the tools that you have, do you think it'd be an improvement for you? Yes, yeah. And what? What part of the
+
+154
+00:25:24.530 --> 00:25:29.650
+GBM01 09FL Buckingham (X52): I think it starts from the project status recording I'm not sure of.
+
+155
+00:25:29.770 --> 00:25:31.530
+GBM01 09FL Buckingham (X52): like I need to do a lot of.
+
+156
+00:25:31.890 --> 00:25:37.399
+GBM01 09FL Buckingham (X52): So it's a cross communication throughout with all those people to understand. Where are we? What we are doing?
+
+157
+00:25:37.610 --> 00:25:41.950
+GBM01 09FL Buckingham (X52): Where do we are? Are we repeating the same steps or not. I'm not sure.
+
+158
+00:25:42.000 --> 00:25:48.025
+GBM01 09FL Buckingham (X52): So it's the collaboration part. And then the ability to understand where you're at? Documentation part. Okay?
+
+159
+00:25:49.350 --> 00:25:51.470
+GBM01 09FL Buckingham (X52): okay, where?
+
+160
+00:25:51.730 --> 00:25:58.689
+GBM01 09FL Buckingham (X52): What about do you think it could replace your whole workflow? Or do you think it would be a tool amongst many
+
+161
+00:25:58.770 --> 00:26:22.080
+GBM01 09FL Buckingham (X52): in your development through deployment? I would not say it would be completely suffice because what happens there are multiple cross collaborations through the platforms also. So we have certain plugins to their, I would say, legacy software. So legacy platforms which goes to the clients. So we have certain connections out there. I think building those connections here would be little challenge. Okay.
+
+162
+00:26:22.110 --> 00:26:24.039
+GBM01 09FL Buckingham (X52): do you think that there's any feature?
+
+163
+00:26:24.370 --> 00:26:34.432
+GBM01 09FL Buckingham (X52): What would you like to see from a feature revision standpoint? Is there any features that we're missing that you'd like to see whether it be single sign on whether it be Linux, more libraries.
+
+164
+00:26:35.017 --> 00:26:57.360
+GBM01 09FL Buckingham (X52): One thing which, given, I heard or like, it's I also felt, because I was in New Delhi's C. By elevate event on 5th October. So a lot of people were asking about more integration of libraries, so that it becomes useful for them, and they save a lot of time, because when they kick, starting their work, when they're kick, starting their projects, they have to spend a lot of time.
+
+165
+00:26:57.360 --> 00:27:03.359
+GBM01 09FL Buckingham (X52): Okay, setting this up. So a more, I would say, library integrations for you, which I think
+
+166
+00:27:03.370 --> 00:27:05.580
+GBM01 09FL Buckingham (X52): would be a good feature. Okay.
+
+167
+00:27:06.389 --> 00:27:22.260
+GBM01 09FL Buckingham (X52): from a from a functionality. So I guess we've been kind of talking about features, right? Adding more libraries or whatnot from a like a functionality standpoint. I guess what's been your experience. Is there? Has there been any hangups for you, any
+
+168
+00:27:22.630 --> 00:27:37.779
+GBM01 09FL Buckingham (X52): any troubles along the way? Whether it be installation. Running a notebook, spinning up a word space, he initially did. I'm not sure what happened to that log like. Initially, when I was struggling with the installation of AI studio, but this got corrected in the new edition.
+
+169
+00:27:38.000 --> 00:27:55.430
+GBM01 09FL Buckingham (X52): So new versions just come out past couple of weeks. Yup, yeah, yeah. Okay, so initially, I think I was in touch with some support people who were trying to get the logs of what happened to the installation and all those things. But after that, as I installed the new version, it's okay. Yeah, it's fine. Okay?
+
+170
+00:27:55.930 --> 00:28:00.329
+GBM01 09FL Buckingham (X52): Okay. Alex, do you have any other questions for Anne while we're we're here?
+
+171
+00:28:01.000 --> 00:28:01.920
+GBM01 09FL Buckingham (X52): Boom.
+
+172
+00:28:03.210 --> 00:28:04.309
+GBM01 09FL Buckingham (X52): yeah, I mean.
+
+173
+00:28:06.890 --> 00:28:09.309
+GBM01 09FL Buckingham (X52): maybe double clicking on the
+
+174
+00:28:09.500 --> 00:28:12.049
+GBM01 09FL Buckingham (X52): kind of integration piece. Because you said you
+
+175
+00:28:12.180 --> 00:28:18.590
+GBM01 09FL Buckingham (X52): have to. You say you want to connect into like your kind, you said the existing systems. Basically.
+
+176
+00:28:18.720 --> 00:28:24.330
+GBM01 09FL Buckingham (X52): and I would, I've been in customer interests in the past. You know, seeing like that sort of like the results.
+
+177
+00:28:25.150 --> 00:28:29.659
+GBM01 09FL Buckingham (X52): Do you? Do you want integration? Or is that like a requirement for your company to adopt?
+
+178
+00:28:30.230 --> 00:28:37.671
+GBM01 09FL Buckingham (X52): I think they're trying to adopt because they want to integrate everything at a single case it's not very scattered like
+
+179
+00:28:38.030 --> 00:28:49.760
+GBM01 09FL Buckingham (X52): a soft drink client would want the dashboard in some other way, or it's some other integrations. The 2 based guys would want something different. So what they're trying to do, they're trying to uniform the things, bring everything in a single platform.
+
+180
+00:28:49.910 --> 00:28:51.030
+GBM01 09FL Buckingham (X52): And then.
+
+181
+00:28:51.190 --> 00:29:02.660
+GBM01 09FL Buckingham (X52): finding a little. As for the clients to come in later rather than building the entire things. As for the clients right from the 1st I would say 1st piece, because Neilson works a lot with
+
+182
+00:29:02.770 --> 00:29:06.370
+GBM01 09FL Buckingham (X52): market research like maybe
+
+183
+00:29:06.530 --> 00:29:15.059
+GBM01 09FL Buckingham (X52): market shares as to see. And then they have assortment optimization. How should the assortments be optimized for all those things. So a lot of
+
+184
+00:29:15.180 --> 00:29:24.649
+GBM01 09FL Buckingham (X52): different different chunks are there. But they're trying to bring all of them integrated into one uniform system. So that's all needs an IQ one. As of now.
+
+185
+00:29:24.740 --> 00:29:27.679
+GBM01 09FL Buckingham (X52): So I think the integration would be a very.
+
+186
+00:29:27.790 --> 00:29:29.560
+GBM01 09FL Buckingham (X52): very much useful addition to
+
+187
+00:29:29.790 --> 00:29:31.829
+GBM01 09FL Buckingham (X52): they're right to their journey.
+
+188
+00:29:32.110 --> 00:29:39.679
+GBM01 09FL Buckingham (X52): Okay, do you know you have any thoughts on how that integration might work for a studio like, how would you want to integrate with AI studio?
+
+189
+00:29:40.630 --> 00:29:43.919
+GBM01 09FL Buckingham (X52): I think the majority of integration would be near the deployments.
+
+190
+00:29:45.735 --> 00:29:50.610
+GBM01 09FL Buckingham (X52): Like, I see a tab for local deployments and all those things. I think
+
+191
+00:29:50.760 --> 00:29:53.860
+GBM01 09FL Buckingham (X52): we can integrate that part. Okay, that's what the
+
+192
+00:29:54.050 --> 00:29:57.289
+GBM01 09FL Buckingham (X52): that's what the clients would also want. And we would also want to integrate
+
+193
+00:29:57.430 --> 00:30:04.950
+GBM01 09FL Buckingham (X52): in a more seamless manner. Okay, I think your your time is up for us.
+
+194
+00:30:05.990 --> 00:30:20.310
+GBM01 09FL Buckingham (X52): And how about you? Would you be able to integrate a studio from given your experience the way it is now into your daily work list
+
+195
+00:30:21.030 --> 00:30:25.758
+GBM01 09FL Buckingham (X52): at work. I don't think so.
+
+196
+00:30:27.634 --> 00:30:50.219
+GBM01 09FL Buckingham (X52): There, there! So there are a few things I I have missed a few updates, though, so I, I can ask you a few questions. So when uploading a data, for example, like the data says, File we are able to update to upload their device. For example, right? We can go to any length. Right?
+
+197
+00:30:50.759 --> 00:31:02.010
+GBM01 09FL Buckingham (X52): Okay. So right now, we in this part of the Miami. We are having a bucket in S. 3. So
+
+198
+00:31:02.190 --> 00:31:07.700
+GBM01 09FL Buckingham (X52): the configuration within AI studio would be.
+
+199
+00:31:09.370 --> 00:31:10.540
+GBM01 09FL Buckingham (X52): yeah, I couldn't
+
+200
+00:31:11.030 --> 00:31:12.090
+GBM01 09FL Buckingham (X52): replace.
+
+201
+00:31:12.170 --> 00:31:32.999
+GBM01 09FL Buckingham (X52): This was the one replace the extra bucket would be either to be able to create the buckets itself within the AI studio which you're setting means, okay, can a data engineer also connect to the AI studio project, and I don't know within their
+
+202
+00:31:33.320 --> 00:31:40.489
+GBM01 09FL Buckingham (X52): engineering pipelines or whatever they are taking the data from somewhere out out right. They they're
+
+203
+00:31:40.750 --> 00:31:48.930
+GBM01 09FL Buckingham (X52): sources or documents and stuff they would be able to programmatically save those documents within a studio.
+
+204
+00:31:49.561 --> 00:31:53.009
+GBM01 09FL Buckingham (X52): Just making sure I'm following. So you're asking.
+
+205
+00:31:53.520 --> 00:31:57.360
+GBM01 09FL Buckingham (X52): Let's say we have a huge app
+
+206
+00:31:57.570 --> 00:31:59.939
+GBM01 09FL Buckingham (X52): where people are uploading
+
+207
+00:32:00.740 --> 00:32:15.899
+GBM01 09FL Buckingham (X52): financial documents. No, no, no, just the app. And we want to create a pipeline that's looking, taking all those documents, badges or whatever, and
+
+208
+00:32:16.010 --> 00:32:21.679
+GBM01 09FL Buckingham (X52): processing them. Taking, for example, the image is out of those documents, the text
+
+209
+00:32:21.840 --> 00:32:26.300
+GBM01 09FL Buckingham (X52): now via a stuff like that and saving them into a bucket worth
+
+210
+00:32:26.570 --> 00:32:27.620
+GBM01 09FL Buckingham (X52): data
+
+211
+00:32:28.960 --> 00:32:42.359
+GBM01 09FL Buckingham (X52): data store within AI studio programmatically because you cannot. It's not like an Csv file that you're uploading to Aa studio. You need to do it programmatically to create like 40 50,000 documents.
+
+212
+00:32:42.870 --> 00:33:09.253
+GBM01 09FL Buckingham (X52): I believe that's possible. But it would take integration into your own, I guess processes. So the building processes, I guess, as a team kinda around that but technically, yes, I believe that is, and the compute.
+
+213
+00:33:10.030 --> 00:33:17.160
+GBM01 09FL Buckingham (X52): So right now we are using sagemaker. But the problem is, and
+
+214
+00:33:17.210 --> 00:33:37.180
+GBM01 09FL Buckingham (X52): what I have been countering a lot is that, for example, accounts create instances with huge Gpu and I have been needing huge Gpu. Why, I have no idea, and to go into a company and start to try to pinpoint and follow the threads, to who needs to give me access to what? Where?
+
+215
+00:33:37.250 --> 00:33:38.290
+GBM01 09FL Buckingham (X52): IS.
+
+216
+00:33:38.310 --> 00:33:47.969
+GBM01 09FL Buckingham (X52): It's it's time lost. And I can create all these small instances. And I also have the cap on the route. I have only 100, but 100 is wrong.
+
+217
+00:33:48.170 --> 00:34:07.789
+GBM01 09FL Buckingham (X52): which is not enough, or computing event experience. So your restrictions are like the restrictions or companies based on you for establishing instances within. Aws, yeah, I think it's the restrictions over restrictions on any on anybody, and this usually is the biggest hurdle for us to pro to to further our experiments are
+
+218
+00:34:07.880 --> 00:34:10.189
+GBM01 09FL Buckingham (X52): data science, just because.
+
+219
+00:34:10.489 --> 00:34:11.239
+GBM01 09FL Buckingham (X52): yeah.
+
+220
+00:34:11.639 --> 00:34:15.447
+GBM01 09FL Buckingham (X52): sorry. How how much round did you say that, you 100 100,
+
+221
+00:34:16.630 --> 00:34:21.236
+GBM01 09FL Buckingham (X52): can we say, huge cpus like, what size are you looking for?
+
+222
+00:34:21.710 --> 00:34:34.636
+GBM01 09FL Buckingham (X52): I don't know. These are those Mega, Chicago. I don't know cause they have, like 50 types of Nvidia Gpus there, where you can choose from. Yeah, I choose from the top.
+
+223
+00:34:36.444 --> 00:34:37.139
+GBM01 09FL Buckingham (X52): Yeah.
+
+224
+00:34:38.532 --> 00:34:40.580
+GBM01 09FL Buckingham (X52): So, Andrada, I guess
+
+225
+00:34:40.900 --> 00:34:44.549
+GBM01 09FL Buckingham (X52): technically, you could yeah, integrate as studio. Would you want to?
+
+226
+00:34:44.659 --> 00:34:59.010
+GBM01 09FL Buckingham (X52): Yeah, yeah, yeah. What about AI studios and features? I guess available makes you say that you would want to? I know Akron sound like a lot of the collaboration features. But is it same for you? The collaboration part of it, or
+
+227
+00:34:59.020 --> 00:35:02.485
+GBM01 09FL Buckingham (X52): or just kind of have the whole centralization? Well,
+
+228
+00:35:03.540 --> 00:35:04.710
+GBM01 09FL Buckingham (X52): so
+
+229
+00:35:06.326 --> 00:35:10.253
+GBM01 09FL Buckingham (X52): yeah. And had it said, I would say centralization, just because,
+
+230
+00:35:11.280 --> 00:35:12.360
+GBM01 09FL Buckingham (X52): the
+
+231
+00:35:12.670 --> 00:35:19.824
+GBM01 09FL Buckingham (X52): right now, no, because we are students, data scientists. So we collaborate quite a lot. But when you have a bigger team
+
+232
+00:35:20.320 --> 00:35:33.000
+GBM01 09FL Buckingham (X52): and some people are working on something, some people are working on other things, we lose track of which what data sets on? Where are we working on python and
+
+233
+00:35:33.150 --> 00:35:41.497
+GBM01 09FL Buckingham (X52): 3.10? My framework isn't uploading for you. It worked. Why.
+
+234
+00:35:42.260 --> 00:35:55.720
+GBM01 09FL Buckingham (X52): windows is a bother sometimes. No! So I have been for the last 2 projects I was on. I worked on windows, and right now I'm working on Macos.
+
+235
+00:35:56.280 --> 00:36:13.955
+GBM01 09FL Buckingham (X52): scared of bugger. Sometimes it's it's good in some cases, but yeah, some some. They are all of Max. And, for example, I couldn't even close the repository, because Mac, for some reason, has
+
+236
+00:36:14.750 --> 00:36:19.150
+GBM01 09FL Buckingham (X52): different limits. Then I didn't know that I just thought
+
+237
+00:36:19.800 --> 00:36:21.239
+GBM01 09FL Buckingham (X52): I have it. Yeah.
+
+238
+00:36:21.550 --> 00:36:32.430
+GBM01 09FL Buckingham (X52): yeah. And Jerry Alex. Any last questions I would put one question that we heard from the invitees in the last event at at New Days.
+
+239
+00:36:32.450 --> 00:36:37.179
+GBM01 09FL Buckingham (X52): So they were asking, How should I position AI studio other than an orchestrator.
+
+240
+00:36:38.010 --> 00:36:40.359
+GBM01 09FL Buckingham (X52): so like, if they are to
+
+241
+00:36:40.690 --> 00:36:42.519
+GBM01 09FL Buckingham (X52): take this to the it Dns
+
+242
+00:36:42.580 --> 00:36:48.790
+GBM01 09FL Buckingham (X52): of the of the organization, they have a question that how is it different from the orchestrators, or what's extra?
+
+243
+00:36:48.970 --> 00:36:57.879
+GBM01 09FL Buckingham (X52): How should how should this fit in in our workflow? I think they are looking for more specific communications, maybe like, how can they take this
+
+244
+00:36:58.040 --> 00:37:20.590
+GBM01 09FL Buckingham (X52): to their higher levels? Who have the decision making pars or etc? So they were asking these questions because they wanted this clarity so that they can take this ahead to their to the decision makers and get the things going. Yes, yes, because last in the last event there was a lot of discussion on Esudu.
+
+245
+00:37:20.600 --> 00:37:30.499
+GBM01 09FL Buckingham (X52): One question was, when it's getting lost in India and all those things. And this was that like, how should we position it at
+
+246
+00:37:30.730 --> 00:37:35.429
+GBM01 09FL Buckingham (X52): other than that? They ask that how it's different from about orchestrator or something like that.
+
+247
+00:37:35.490 --> 00:37:50.970
+GBM01 09FL Buckingham (X52): So we need to make certain, maybe some handouts to them which can be useful to useful for them to understand and to pitch it better to the so would you say, then, if you think about how to tell somebody that
+
+248
+00:37:51.110 --> 00:38:13.969
+GBM01 09FL Buckingham (X52): we've got our website up, we don't have right. We're getting close to a couple of class. We don't have a lot of information out there. Where would where would you think that somebody would go right now to find out information on AI studio? I wanted it to be a key page kind of thing which has certain information which we usually wanted.
+
+249
+00:38:14.110 --> 00:38:22.749
+GBM01 09FL Buckingham (X52): We put up certain use cases, maybe random use cases which are very frequent, maybe demand forecastings, use cases something like that, so that they can also relate.
+
+250
+00:38:22.960 --> 00:38:41.379
+GBM01 09FL Buckingham (X52): and they can use those examples to pitch to their organization. This has been a common theme. Is that, hey? Can you send me a used case? Can you send? I don't understand. I see the website. But show me how I would use it
+
+251
+00:38:42.159 --> 00:38:58.430
+GBM01 09FL Buckingham (X52): like, because in that event, most of them from were from health tech and insurance insurance industry. So they were trying to understand. How can I do this or something like that? So what what I figured out from that event is, most of them wanted to understand
+
+252
+00:38:58.460 --> 00:39:09.219
+GBM01 09FL Buckingham (X52): majority of 3 themes, Fintech, Health Tech and Agritech in in India. Specifically, yeah. So these are the 3 themes, I would say, which them which the organizations are working very hard.
+
+253
+00:39:09.400 --> 00:39:15.899
+GBM01 09FL Buckingham (X52): So if even we can put one example of each, that would be easier for them to position it, I
+
+254
+00:39:16.030 --> 00:39:16.700
+GBM01 09FL Buckingham (X52): quote
+
+255
+00:39:17.472 --> 00:39:30.517
+GBM01 09FL Buckingham (X52): I mean, we have a ton more questions. But yeah, about the features. Maybe afterwards, if you have time.
+
+256
+00:39:33.373 --> 00:39:41.399
+GBM01 09FL Buckingham (X52): it's like, so it's like so much budgeting. The speed is me dating. Yeah.
+
+257
+00:39:42.690 --> 00:39:56.247
+GBM01 09FL Buckingham (X52): we're speeding with, yeah, all the different products. Yeah, we maybe should have.
+
+258
+00:39:57.290 --> 00:40:14.426
+GBM01 09FL Buckingham (X52): Hi, Hello, I was told you were tough in here.
+
+259
+00:40:17.040 --> 00:40:20.520
+GBM01 09FL Buckingham (X52): Fabian, I think this this should be one more.
+
+260
+00:40:20.950 --> 00:40:22.120
+GBM01 09FL Buckingham (X52): not a great one.
+
+261
+00:40:23.785 --> 00:40:41.964
+GBM01 09FL Buckingham (X52): They're gonna bring Ackerman so that we have a whole half hour.
+
+262
+00:40:43.520 --> 00:40:45.339
+GBM01 09FL Buckingham (X52): It's mostified. Yeah.
+
+263
+00:40:45.350 --> 00:40:53.360
+GBM01 09FL Buckingham (X52): So the only reason recording just so we can have a reference. And I don't seriously take notes. Informal session. So we got some questions. But just
+
+264
+00:40:53.390 --> 00:41:05.170
+GBM01 09FL Buckingham (X52): if you guys want to like, speak your mind over on and new speaker remind me to get product team like we want to make the product better develop. We're not here. How we can sell better. I mean, we want to know how we can set up.
+
+265
+00:41:05.180 --> 00:41:13.769
+GBM01 09FL Buckingham (X52): Don't sell to us. Tell us like what you told one thing about it. We won't see the group term what would prevent you from like adopting it as far as these other use
+
+266
+00:41:13.870 --> 00:41:16.099
+GBM01 09FL Buckingham (X52): like, why, it wouldn't work for your wife, that's
+
+267
+00:41:17.125 --> 00:41:29.080
+GBM01 09FL Buckingham (X52): so before we jump in, there's kind of like direct product feedback, just like a little bit about yourselves. What company you guys have. And what is your team size that you work in work with through your data science. So I guess workflows.
+
+268
+00:41:30.066 --> 00:41:49.279
+GBM01 09FL Buckingham (X52): I work for Germany. That's basically the high speed trains in Germany. I work in a fairly small unit of 30 people like, I think it's maybe 10 to 15 data scientists. And we mainly do work on text data. So
+
+269
+00:41:49.400 --> 00:41:59.809
+GBM01 09FL Buckingham (X52): we have a lot of feedbacks. We get from trains from customers that we like process in real time to some modeling on top of it. And yeah, that's basically what I do for
+
+270
+00:41:59.960 --> 00:42:09.109
+GBM01 09FL Buckingham (X52): 1015 data scientists all kind of working together at the same time, or will be kind of split off. And so you might be working with
+
+271
+00:42:09.460 --> 00:42:14.089
+GBM01 09FL Buckingham (X52): 2 to 5. Yeah, okay.
+
+272
+00:42:14.729 --> 00:42:24.309
+GBM01 09FL Buckingham (X52): Yeah, I'm Nick. I have my own company's con creation. We're a small startup. So the tech team is is 6 people like overall
+
+273
+00:42:24.380 --> 00:42:40.610
+GBM01 09FL Buckingham (X52): they, I mean, we don't have data science. Even so the AI team. And we're 2 people, actually. But like, we're fundraising right now. So looking forward to grow it even more, yeah, what we do a lot is genai. So we generate design. So image generation.
+
+274
+00:42:40.900 --> 00:42:49.644
+GBM01 09FL Buckingham (X52): And yeah, recommended systems. Those are like the 2 things we work on on a machine learning site.
+
+275
+00:42:50.830 --> 00:42:52.180
+GBM01 09FL Buckingham (X52): No method.
+
+276
+00:42:52.500 --> 00:43:08.439
+GBM01 09FL Buckingham (X52): Yeah, we try to avoid language solving of of our companies like, No, no text inputs. Okay? And then I wanted to ask, do you processing feedback and even real time? So is that language, or is that language? Or we don't use relevance along with?
+
+277
+00:43:08.550 --> 00:43:11.230
+GBM01 09FL Buckingham (X52): It's a bit difficult, Germany especially for touch upon.
+
+278
+00:43:11.500 --> 00:43:23.749
+GBM01 09FL Buckingham (X52): because, like, it's connect to the government. So it's a lot about licensing and every other end that's out there, even though it's open source as its own license on top of it. And
+
+279
+00:43:23.920 --> 00:43:28.239
+GBM01 09FL Buckingham (X52): it's not only the model license that's important, but also the data license.
+
+280
+00:43:29.780 --> 00:43:32.480
+GBM01 09FL Buckingham (X52): I'll bring you a chair. Aye, 10 folks.
+
+281
+00:43:32.880 --> 00:43:33.570
+GBM01 09FL Buckingham (X52): but
+
+282
+00:43:33.840 --> 00:43:34.819
+GBM01 09FL Buckingham (X52): the region
+
+283
+00:43:35.550 --> 00:43:46.170
+GBM01 09FL Buckingham (X52): so data license with like makes it hard for us. Thank you. So we we aren't able to use all of them. So first, st either from scratch or yes, and some lightweights. Custom
+
+284
+00:43:46.210 --> 00:43:50.488
+GBM01 09FL Buckingham (X52): model, that's not using those big architectures.
+
+285
+00:43:51.380 --> 00:44:04.190
+GBM01 09FL Buckingham (X52): So like, even like, is is there a move to, I mean, are you officially work for like, is it a government owned? So so
+
+286
+00:44:04.380 --> 00:44:09.188
+GBM01 09FL Buckingham (X52): yeah, it's it's it's somewhat.
+
+287
+00:44:10.340 --> 00:44:11.940
+GBM01 09FL Buckingham (X52): If you're sleeping.
+
+288
+00:44:12.860 --> 00:44:41.110
+GBM01 09FL Buckingham (X52): Thanks for coming in. Well, so this very informal feedback session, the only reason we're recording just so that we're not like having fears to take notes totally informal here? But yeah, 1st question was just a little bit about you. What company are you at? And what's the size of your data science team in Europe.
+
+289
+00:44:41.110 --> 00:44:46.040
+GBM01 09FL Buckingham (X52): France, Spain, Russia, and Germany, Belgium, and so on.
+
+290
+00:44:46.210 --> 00:45:05.380
+GBM01 09FL Buckingham (X52): And I work there. In a data sense, teams team, we have, like, our team is about 5 people. And right now, we are trying to centralize everything, because in different team, you could find some data sense. This is working there. And right now, we are trying to build like a data
+
+291
+00:45:05.460 --> 00:45:09.760
+GBM01 09FL Buckingham (X52): department, or everyone would just either.
+
+292
+00:45:10.550 --> 00:45:38.752
+GBM01 09FL Buckingham (X52): So this is a great segue into my next question. Kinda and this question is about like, how mature is your data science teams that you work in? Are you trying to like? Figure it out as you go along. Do you have, like a well defined set of tools and processes? So you were just kind of talking about the kind of tools and processes that you have so pretty pretty mature then, or still trying to like
+
+293
+00:45:39.110 --> 00:45:55.230
+GBM01 09FL Buckingham (X52): a lot of tools like in Germany, and they try to divide in every countries. And but most of the time it's not really efficient, because countries that their specification and so on. So what we try to do is to adapt them to
+
+294
+00:45:55.230 --> 00:46:01.610
+GBM01 09FL Buckingham (X52): friends use cases, for example, that are for some tools. But there are other tools where
+
+295
+00:46:01.610 --> 00:46:25.580
+GBM01 09FL Buckingham (X52): we already start from scratch like we don't have anything. So so you've got these teams in different places. But you're trying to take a pretty centralized approach to what tools they should. Everybody should be using. Exactly. Yeah, okay, that's the idea. Okay? Yeah. How about you? Where you just think you're out on the spectrum of trying to figure out, or we're pretty strong on all of our pretty mature
+
+296
+00:46:25.580 --> 00:46:27.519
+GBM01 09FL Buckingham (X52): lot of processes. A lot of
+
+297
+00:46:27.560 --> 00:46:34.413
+GBM01 09FL Buckingham (X52): you kind of have to be if you're in a pretty regular. So thing. Yeah, yeah. Makes it hard. But sometimes
+
+298
+00:46:34.880 --> 00:47:03.689
+GBM01 09FL Buckingham (X52): so I think we got both ends of the spectrum. Then how about how about you? Yeah, I think we we have our programs of a software like we, I mean, that's like we're in a 1st company. So the mindset is different, like one of us, because, like quite young team, so all of them like know what they want to work with. But they're pretty open to to anything. So there's someone posing something new that can be anyone from the team that just said, Yeah, let's go for it and test it out.
+
+299
+00:47:04.180 --> 00:47:20.890
+GBM01 09FL Buckingham (X52): Not super easy for you. Between the tool depends on the tool. In my case, there are some tools that were already developed. Yeah. And we tried to adapt them. And for some over cases we don't have tools. So we tried to build from action.
+
+300
+00:47:21.250 --> 00:47:24.232
+GBM01 09FL Buckingham (X52): Propose, Kate, is the architect going?
+
+301
+00:47:26.066 --> 00:47:34.610
+GBM01 09FL Buckingham (X52): So next set of questions is going to be more about a studio. Your experience with it. So 1st question could you integrate
+
+302
+00:47:34.930 --> 00:47:40.779
+GBM01 09FL Buckingham (X52): to me 2 questions? 1, st one is, could you integrate AI studio into your workflows
+
+303
+00:47:40.900 --> 00:47:42.639
+GBM01 09FL Buckingham (X52): to that? Given her experience with it
+
+304
+00:47:44.766 --> 00:48:00.130
+GBM01 09FL Buckingham (X52): something because it was actually this week, because it was also preparing for for this one. And what we're I mean, we're quite fast pace. So what we we heard about customers now is they would like to. I mean, they're self proaching for you to sketch.
+
+305
+00:48:00.180 --> 00:48:01.530
+GBM01 09FL Buckingham (X52): That's a weird
+
+306
+00:48:01.840 --> 00:48:17.109
+GBM01 09FL Buckingham (X52): channel setup. We do AI for designs, and like one thing is that you sketch you up off of the sketch, and then it will render out. It was another start of doing this on viscom. So we were like looking into this. What's like the best way to do this. And I mean right now, the the
+
+307
+00:48:17.370 --> 00:48:39.200
+GBM01 09FL Buckingham (X52): the way we do. This is is someone's just like opening up a notebook trying out models just like running things locally and then be like, Hey, this was working. Can you check it out and then the check it out. Part is is the hard part right now, because then it's like thing about how I do get. How do I get their environment? If someone else doing it then.
+
+308
+00:48:39.240 --> 00:48:48.009
+GBM01 09FL Buckingham (X52): and not tweaking? Because sometimes it's just like not switching whole models, but sometimes just tweaking parameters. So how do we like get the parameters at the same time?
+
+309
+00:48:48.080 --> 00:49:03.079
+GBM01 09FL Buckingham (X52): So I thought, Hey, that's a great use case I could. I could show tomorrow at the at the demo with the I studio. But my problem is that it wasn't working at all like a a lot of things like booting up the system. When I open visual studio, it just like
+
+310
+00:49:03.230 --> 00:49:20.879
+GBM01 09FL Buckingham (X52): broke down all the time and again and again. And I think, styling there, I mean it like, okay, what I thought would be nice is that you have this call rabbit call liberation tool, where you have the same environment where you can just like run things and set up is easy. Everyone's on the same page. You can share your notebooks.
+
+311
+00:49:21.196 --> 00:49:48.670
+GBM01 09FL Buckingham (X52): This and that. So time saving, of course, because you don't have to like, send it around. You can like do it in real time. But I think the program just feel like the software is really immature in a lot of ways like it breaks down on the start of the program. Many times I had to just restart my workstation, and then it was working. I felt like, if other programs were using the Gpu. So, for example, if I had visual studio open running stuff there and then, I wanted to opening our studio. It was just like not starting.
+
+312
+00:49:48.670 --> 00:49:57.190
+GBM01 09FL Buckingham (X52): then. Workspace creation. I have tons of of feedback on this, so it's just like did most of the time last week, so it wasn't integrated into the ideal portal yet.
+
+313
+00:49:57.540 --> 00:50:25.810
+GBM01 09FL Buckingham (X52): Also like when you click, start on on the workspace, it should say yes, starting Workspace, preparing libraries, and then, after 5 min, just breaks down, says Workspace. But you don't don't get any locks whatsoever. So if I would not have to make the the presentation for tomorrow. I would just be like, Okay, yeah, no way, I'm going to use this again. Because, just like, yeah, adding, like adding a lot of time instead of like producing it. But the idea generally I like it's just like now trying to get there.
+
+314
+00:50:26.130 --> 00:50:42.489
+GBM01 09FL Buckingham (X52): The collaboration part, the shared workspaces part. That's like pretty cool feature. But you're saying that these are functionality issues that you're running into as you try to traverse through the whole workflow of starting up, connecting that all that kind of you've named a couple of different pain points
+
+315
+00:50:42.850 --> 00:50:49.459
+GBM01 09FL Buckingham (X52): something you typically work out. Yes. And were you trying to integrate that with their studio or just running them.
+
+316
+00:50:49.650 --> 00:51:16.470
+GBM01 09FL Buckingham (X52): but simultaneously cause a lot of problems. Yes, yeah, yeah, that was it. I don't know if you could integrate, you cannot integrate, and then I start yes, to do it again, so that you would get like the last version. But you cannot test it like you cannot run your code.
+
+317
+00:51:16.510 --> 00:51:26.730
+GBM01 09FL Buckingham (X52): and you can edit your code on using this code in parallel. And then you could start AI studio again. It would take the last lesson that you edit, but it's not integrated
+
+318
+00:51:26.750 --> 00:51:28.130
+GBM01 09FL Buckingham (X52): one part of public.
+
+319
+00:51:29.480 --> 00:51:32.449
+GBM01 09FL Buckingham (X52): How about you? They're pretty much the same. So
+
+320
+00:51:32.620 --> 00:51:38.502
+GBM01 09FL Buckingham (X52): it's somewhat buggy, but the main idea is pretty neat, I I guess. So.
+
+321
+00:51:39.776 --> 00:51:58.469
+GBM01 09FL Buckingham (X52): Yeah, for me, it was the idea. I think I joined both of them. The Aj. Is really great for me, because my position change in my in my job. No, a little bit of the sentence. No. So I'm leading a team of 5 person. And for me.
+
+322
+00:51:58.470 --> 00:52:15.799
+GBM01 09FL Buckingham (X52): when I was junior I used to work on only on my project moment. I have a team. I have a lot of projects, right? It's definitely helpful for me to have, like an environment where I could see everything. I could see how they are running. I could see the experiments and see how we are going for development. So I think
+
+323
+00:52:15.800 --> 00:52:29.629
+GBM01 09FL Buckingham (X52): that idea is really great for me. Okay, that's the big stuff. I had some couple of experience that was not really good. For example, I could take one example is like, when I start when I created the environment.
+
+324
+00:52:29.690 --> 00:52:40.419
+GBM01 09FL Buckingham (X52): I that's pretty good, because you already have a lot of team that are already installed. Just use them as it is. But when you wanted to install a new stuff.
+
+325
+00:52:40.700 --> 00:52:55.040
+GBM01 09FL Buckingham (X52): You acknowledge you're on your code, it works. But when you restart with the the workspace you have to install it again. Yeah. And each time you you restart, you have to install it again. So shows that, like cause, you were probably doing a lot of
+
+326
+00:52:55.310 --> 00:53:03.346
+GBM01 09FL Buckingham (X52): custom workspaces, predefined workspaces. Given your workflow. Yes, and that's where you ran into a lot of problems.
+
+327
+00:53:03.840 --> 00:53:06.520
+GBM01 09FL Buckingham (X52): yeah. Also, with that, I think it's just
+
+328
+00:53:06.830 --> 00:53:22.859
+GBM01 09FL Buckingham (X52): the way creating these workspaces feels unnatural to me as a computer scientist, because it's too like it's too easy. But then doesn't give you the right flexibility. Yeah, I feel like at the same time it it helps you build the balance of like
+
+329
+00:53:23.140 --> 00:53:40.250
+GBM01 09FL Buckingham (X52): just right. It's not close to how would normally set up my environments also, with putting in the libraries. And then with the versions in this file. I mean, yeah, if you have the requirements. Txt, then then it might work like this?
+
+330
+00:53:40.604 --> 00:53:48.295
+GBM01 09FL Buckingham (X52): But yeah, most of like, I don't know if this point get over. Like, if you so I create the workspace. I run my code as the
+
+331
+00:53:48.640 --> 00:53:57.746
+GBM01 09FL Buckingham (X52): should this one library is missing, so I just install it in the terminal inside the workspace I stop the workspace and re restart the workspace, and it's not there again.
+
+332
+00:53:58.570 --> 00:54:00.509
+GBM01 09FL Buckingham (X52): And like this process of
+
+333
+00:54:00.550 --> 00:54:16.019
+GBM01 09FL Buckingham (X52): like, okay? And then it could be like, okay, like what I also did. I just created a new Workspace with the new libraries. But then it just takes forever to do this. And I think also, maybe one thing that could be good is to have like a login. That at least told you some error message
+
+334
+00:54:16.370 --> 00:54:45.555
+GBM01 09FL Buckingham (X52): to tell you what's wrong. For example, because I tried some deployment stuff. I I got the message, but it fell. But I I have no reason why, so I couldn't figure out what I need to fix actually
+
+335
+00:54:46.260 --> 00:54:50.869
+GBM01 09FL Buckingham (X52): stuff inside their studio. So it's hard to find a tradeoff or the threshold
+
+336
+00:54:51.270 --> 00:55:14.880
+GBM01 09FL Buckingham (X52): in between, like the easy to useness and flexibility. I think it's a bit too easy to use it right now. So you could maybe make it a little bit more. Yeah. So you guys, so you guys, I was just gonna say, so, you guys are super users. Right? You guys are so on the advanced side of, I would think, would you agree with that? You guys are on the advanced side of data scientists. I would think so. Do you?
+
+337
+00:55:15.930 --> 00:55:20.210
+GBM01 09FL Buckingham (X52): Do you think that for you guys, you're wanting more, you're wanting more
+
+338
+00:55:20.470 --> 00:55:27.689
+GBM01 09FL Buckingham (X52): the ability to be able to get in and do customization where it sounds like, you're almost saying in some instances, like, Yeah, like I,
+
+339
+00:55:27.970 --> 00:55:30.219
+GBM01 09FL Buckingham (X52): it's making it too easy for me.
+
+340
+00:55:30.470 --> 00:55:42.400
+GBM01 09FL Buckingham (X52): But you want to like, be able to get underneath that have a little bit like, is that part of it? Or is it really just more of a functionality is to booking. Yeah, I think it's good to have some flexibility. Yeah, I think
+
+341
+00:55:42.440 --> 00:55:46.959
+GBM01 09FL Buckingham (X52): for customization. For example, when I
+
+342
+00:55:47.180 --> 00:55:56.069
+GBM01 09FL Buckingham (X52): from my code, for example, from Github, I got it directly on the folder system. But when I wanted to create like
+
+343
+00:55:56.570 --> 00:56:03.360
+GBM01 09FL Buckingham (X52): I wanted to load my model checkpoint, for example, and I don't want to put it on the data for break folder. And I wanted
+
+344
+00:56:03.680 --> 00:56:29.760
+GBM01 09FL Buckingham (X52): just put it in special form. That was was impossible for me, because it's directly goes to that. So that's also, I think, like adding a layer of flexibility. Also, when you created an environment, I think that I already share that with you. I always use that, too.
+
+345
+00:56:30.055 --> 00:56:53.070
+GBM01 09FL Buckingham (X52): So when you basically spin a project up like create an environment, there's like the AI studio environment. And then there's like a different environment. And so you could like, put everything in the wrong environment. Or you have to kind of know to go to that environment. Yeah, well, I think we fix. I think we think we fix that so that the default is the AI studio environment, because at 1st people are like losing
+
+346
+00:56:53.120 --> 00:56:57.799
+GBM01 09FL Buckingham (X52): environments that we're setting up because it's just like a simple thing you just have to click on through.
+
+347
+00:56:58.190 --> 00:56:59.550
+GBM01 09FL Buckingham (X52): Yeah, that's explicit.
+
+348
+00:57:01.500 --> 00:57:11.529
+GBM01 09FL Buckingham (X52): most of the things you guys mentioned have all been around functionality things that a lot of some of them fixable. Some of them are like ui changes. Some of them are like bugs. That kind of stuff. What about from a feature standpoint
+
+349
+00:57:11.620 --> 00:57:19.750
+GBM01 09FL Buckingham (X52): like I guess. Maybe ignoring the things. If you kind of ignoring just the some of the functionality, part of it.
+
+350
+00:57:19.760 --> 00:57:28.110
+GBM01 09FL Buckingham (X52): Are we missing any features that would prevent you from being able to integrate as duty one to your portfolio? Are the features. There, that would allow for it.
+
+351
+00:57:29.260 --> 00:57:38.239
+GBM01 09FL Buckingham (X52): Yeah. One feature that I found really interesting actually, is Mfu, because I wasn't using it before I was using a lot of different tracking experiment stuff.
+
+352
+00:57:38.560 --> 00:57:56.429
+GBM01 09FL Buckingham (X52): But I think that's definitely good to have this tool locally, so that you are not sharing most of the tools that I used to use their own cloud. So sometimes, when you share your experiment, you share a lot of details, your environment, and so on with those provider, and I think that's having
+
+353
+00:57:56.640 --> 00:58:24.138
+GBM01 09FL Buckingham (X52): that's directly on as to do is really good because you have the already devoted. You could just track everything so. But I think maybe if for some people that use tools that are on Internet, such as wait and buy or so on, maybe it would be good for them also to have, like a logging system where they could just do it on as to do and would be pushed as well.
+
+354
+00:58:24.500 --> 00:58:31.519
+GBM01 09FL Buckingham (X52): That's a layer of flexibility as well. We're connecting outside in the flow instances I'm not sure
+
+355
+00:58:32.111 --> 00:58:43.638
+GBM01 09FL Buckingham (X52): at work. We have a centralized overflow server, and this one's using the local one. So I'm not sure maybe you could find a way of connecting to other service
+
+356
+00:58:44.950 --> 00:59:02.247
+GBM01 09FL Buckingham (X52): in India. Yeah. So like, maybe the 1.2. And also because I'm not using it all, so I would not need it. So to me, it's actually, I mean, it doesn't hurt having it there. But I would rather not have it. But just as something else. Or, yeah, likewise
+
+357
+00:59:02.740 --> 00:59:03.880
+GBM01 09FL Buckingham (X52): we use
+
+358
+00:59:04.840 --> 00:59:17.870
+GBM01 09FL Buckingham (X52): yeah. And then the S code, where I think what I would also like, which is done very well in the S. Code is Github connection, which is, I think, right now, not so nice on. I I study, I mean it is there.
+
+359
+00:59:18.040 --> 00:59:20.820
+GBM01 09FL Buckingham (X52): But again, it feels kind of unnatural.
+
+360
+00:59:21.030 --> 00:59:25.410
+GBM01 09FL Buckingham (X52): And like, I cannot, I cannot really say why. But
+
+361
+00:59:25.550 --> 00:59:28.500
+GBM01 09FL Buckingham (X52): except when just announcing unity ballet type thing.
+
+362
+00:59:28.670 --> 00:59:34.489
+GBM01 09FL Buckingham (X52): Yeah, it's just so. It's again, the interface is so different to other.
+
+363
+00:59:34.860 --> 01:00:03.880
+GBM01 09FL Buckingham (X52): I I cannot really say why, but I think there's like something that's the escort is doing very well that you have all of, I guess, like I switched completely from command line to doing everything get up related in the S code, because just so simple to do it. And you have everything like, yeah, they made it like they made it very well, combining this flexibility with the ease of use with with Github. So that's something I would like to have also, okay, yeah. And I, I really don't.
+
+364
+01:00:04.030 --> 01:00:18.060
+GBM01 09FL Buckingham (X52): Well, it's it's strange to have Jupiter as the main entry point in and everything. So using the terminal to Jupiter interface and using code through Jupiter, just doesn't feel natural. So would be nice to have some sort of
+
+365
+01:00:19.220 --> 01:00:24.600
+GBM01 09FL Buckingham (X52): other terminal, or you could use it through Vs code. Maybe so, this would feel much more
+
+366
+01:00:25.610 --> 01:00:26.660
+GBM01 09FL Buckingham (X52): like a
+
+367
+01:00:26.740 --> 01:00:35.540
+GBM01 09FL Buckingham (X52): things that didn't work well is Jupiter. And like an id that you're comfortable to use before, would you want like a different Id? Or is it just more
+
+368
+01:00:35.890 --> 01:00:40.569
+GBM01 09FL Buckingham (X52): the way that you're interacting. But yeah, it's just the way, okay, so yeah, hmm.
+
+369
+01:00:41.240 --> 01:00:46.610
+GBM01 09FL Buckingham (X52): just feel strange. It's a lot of clicks like to go into the term terminal.
+
+370
+01:00:46.980 --> 01:00:48.150
+GBM01 09FL Buckingham (X52): So I had to.
+
+371
+01:00:48.600 --> 01:00:57.618
+GBM01 09FL Buckingham (X52): It's 1 click. Yeah, but it still is. So you should have your your
+
+372
+01:00:59.450 --> 01:01:00.325
+GBM01 09FL Buckingham (X52): okay
+
+373
+01:01:01.270 --> 01:01:04.826
+GBM01 09FL Buckingham (X52): any other. Any other features that you would want to see
+
+374
+01:01:05.730 --> 01:01:10.780
+GBM01 09FL Buckingham (X52): whether it be Linux, whether it be more libraries, whether it be different. Ide.
+
+375
+01:01:12.330 --> 01:01:13.459
+GBM01 09FL Buckingham (X52): map of something.
+
+376
+01:01:13.930 --> 01:01:20.779
+GBM01 09FL Buckingham (X52): I'm not sure what's running in the background, but they once tried to. So I have this custom run that loss function that I have to.
+
+377
+01:01:21.330 --> 01:01:23.350
+GBM01 09FL Buckingham (X52): that that I have to bid myself, and
+
+378
+01:01:23.470 --> 01:01:32.759
+GBM01 09FL Buckingham (X52): I have to use a clear toolkit for doing so, and I'm not sure if this would work inside those instances that I have in a studio
+
+379
+01:01:33.490 --> 01:01:34.910
+GBM01 09FL Buckingham (X52): which which one must be.
+
+380
+01:01:35.360 --> 01:01:44.889
+GBM01 09FL Buckingham (X52): I I'm not sure if I can use it in a inside a studio, because it's I'm not sure what what type of cuda it's using. So it's, I'm pretty sure that cuda. Okay isn't installed
+
+381
+01:01:46.080 --> 01:01:49.270
+GBM01 09FL Buckingham (X52): per se. It's just this python pip
+
+382
+01:01:49.280 --> 01:01:55.599
+GBM01 09FL Buckingham (X52): thing that gets installed into the environment. It's actually promoted. Okay.
+
+383
+01:01:56.290 --> 01:01:57.670
+GBM01 09FL Buckingham (X52): I haven't tried it.
+
+384
+01:01:57.850 --> 01:02:04.020
+GBM01 09FL Buckingham (X52): So I tried it once, but it didn't work so I could figure it out. But yeah, this is this type of flexibility that
+
+385
+01:02:04.350 --> 01:02:05.220
+GBM01 09FL Buckingham (X52): my name?
+
+386
+01:02:05.370 --> 01:02:07.869
+GBM01 09FL Buckingham (X52): It would be nice to have anything.
+
+387
+01:02:09.130 --> 01:02:16.930
+GBM01 09FL Buckingham (X52): So how about like data connections like, we connect to aws, yeah, that's why local today, like, do you guys use other
+
+388
+01:02:18.100 --> 01:02:20.830
+GBM01 09FL Buckingham (X52): other meeting data sources that you'd like to connect to?
+
+389
+01:02:21.950 --> 01:02:29.150
+GBM01 09FL Buckingham (X52): I like the way it is like taking in your data using? Yeah, I already like that. There's 1 point. Actually, I like that part.
+
+390
+01:02:29.190 --> 01:02:33.383
+GBM01 09FL Buckingham (X52): There is one fine with the shared folder. I don't know if you've talked about it, but
+
+391
+01:02:33.650 --> 01:02:39.542
+GBM01 09FL Buckingham (X52): once you short, like code or data in the short environments over person cannot see, for example.
+
+392
+01:02:40.010 --> 01:02:41.649
+GBM01 09FL Buckingham (X52): from the same project
+
+393
+01:02:42.090 --> 01:02:51.459
+GBM01 09FL Buckingham (X52): like, so you are working. If I'm working with Danielle in a project, and I put my code, for example, in shared folder. He cannot see them, for example, today
+
+394
+01:02:52.030 --> 01:03:20.449
+GBM01 09FL Buckingham (X52): and for me. The idea of the short folder is like everyone has access to the. So you have to be logged in both the same time, because I think I don't know if that's if that solves it for yeah. And I mean, it's nice that you have peer to peer, because like data, safety and everything.
+
+395
+01:03:20.990 --> 01:03:46.840
+GBM01 09FL Buckingham (X52): But yeah, it's also I see the used case that someone works on it. I don't know on a Sunday, so no one else is working yet. I'll put something to shared. Monday, you see. Take the day off, and then someone's bugging into shared, and it's not there. So it's not if if that's the case. So that's what you're finding. That's that's not working as attended. But then, how is it working? Because I think.
+
+396
+01:03:47.230 --> 01:03:53.372
+GBM01 09FL Buckingham (X52): set it up that it's a computer? Oh, that's a huge yeah. So it's it should be pushing it.
+
+397
+01:03:53.770 --> 01:04:03.530
+GBM01 09FL Buckingham (X52): yeah. So it should be pushing it. When you put it in there. And there's a data sync layer that's basically syncing everything up. So yeah, you should absolutely be able to put something in the shared folder.
+
+398
+01:04:03.640 --> 01:04:04.680
+GBM01 09FL Buckingham (X52): And then
+
+399
+01:04:05.600 --> 01:04:11.540
+GBM01 09FL Buckingham (X52): you don't. It's not a requirement, somebody to be logged on at the same time. So I think he's pushing that to.
+
+400
+01:04:12.850 --> 01:04:16.169
+GBM01 09FL Buckingham (X52): Okay, yeah. So it's like taking calls. Yeah, yeah.
+
+401
+01:04:16.674 --> 01:04:22.179
+GBM01 09FL Buckingham (X52): I thought so. Yeah, because, Peter, be the whole things that you both like
+
+402
+01:04:22.210 --> 01:04:27.132
+GBM01 09FL Buckingham (X52): both connected. Yeah. So if you're not letting that it won't work. But yeah, okay, yeah.
+
+403
+01:04:28.320 --> 01:04:34.849
+GBM01 09FL Buckingham (X52): alright, I'll follow up. But I'm positive that that's yeah. The idea behind that is that you can share
+
+404
+01:04:35.040 --> 01:04:35.990
+GBM01 09FL Buckingham (X52): data
+
+405
+01:04:36.790 --> 01:04:46.739
+GBM01 09FL Buckingham (X52): without having to go to the cloud, doesn't you? Don't do one? Where does we raise the same direction of like? Well, what if they're working like awesome? How do I think
+
+406
+01:04:47.170 --> 01:04:49.519
+GBM01 09FL Buckingham (X52): that's what we have. Okay, that's the thing.
+
+407
+01:04:50.620 --> 01:05:08.629
+GBM01 09FL Buckingham (X52): Can I summarize everything you guys just said, and that the idea behind the I studio and what we're trying to do with the collaboration of the thing is good. Centralization is good. But you're finding from a functionality point. Would you say that it's just too mature at this point, or either bow you or mature. Is that kind of what you to summer up to summarize? Did I get that right
+
+408
+01:05:08.830 --> 01:05:10.059
+GBM01 09FL Buckingham (X52): from your experience
+
+409
+01:05:10.962 --> 01:05:14.400
+GBM01 09FL Buckingham (X52): using the latest version? Or, yeah.
+
+410
+01:05:14.660 --> 01:05:16.840
+GBM01 09FL Buckingham (X52): did you guys try to do any seat?
+
+411
+01:05:16.940 --> 01:05:18.630
+GBM01 09FL Buckingham (X52): Let's see, it's number.
+
+412
+01:05:22.490 --> 01:05:23.340
+GBM01 09FL Buckingham (X52): okay,
+
+413
+01:05:24.360 --> 01:05:25.840
+GBM01 09FL Buckingham (X52): Alex, did you have any of them.
+
+414
+01:05:27.430 --> 01:05:44.610
+GBM01 09FL Buckingham (X52): I mean, yeah, if we have the long list. But I mean, maybe talking about sort of tabs. Yeah, you know, one of the things that we do right now is obviously enabled. But going beyond local deployments. And maybe this is something that these guys are interested in because
+
+415
+01:05:45.020 --> 01:05:47.799
+GBM01 09FL Buckingham (X52): we did do introductions. But given that, we
+
+416
+01:05:48.170 --> 01:06:04.420
+GBM01 09FL Buckingham (X52): got extra time with you guys. So they support a basically manage workstation solution. So in London you have, how many? So think we have a session later today. But the whole idea.
+
+417
+01:06:04.420 --> 01:06:26.180
+GBM01 09FL Buckingham (X52): you know, you can get compute as a service where AI studio, for you know, Gpus service. All of that could be deployed from those workstations rather than you know getting your workload running on the cloud. If you have up to like, you know, models or fine tuning that you want to do that has up to like 50 billion parameters. You could do all of that
+
+418
+01:06:26.220 --> 01:06:28.359
+GBM01 09FL Buckingham (X52): on on these workstations.
+
+419
+01:06:28.450 --> 01:06:29.483
+GBM01 09FL Buckingham (X52): So it's
+
+420
+01:06:31.650 --> 01:06:39.380
+GBM01 09FL Buckingham (X52): yeah, it's just like the cloud, you know, connections to S 3. And any other data sources that you want. But you get
+
+421
+01:06:39.580 --> 01:06:41.729
+GBM01 09FL Buckingham (X52): predictable performance.
+
+422
+01:06:42.576 --> 01:06:51.429
+GBM01 09FL Buckingham (X52): Yeah. So we're really interested in understanding how we can enable users to scale up better to like larger.
+
+423
+01:06:51.500 --> 01:06:53.700
+GBM01 09FL Buckingham (X52): Since Houston, I don't know. Maybe
+
+424
+01:06:53.860 --> 01:07:01.579
+GBM01 09FL Buckingham (X52): you guys can talk about like what your deployments look like at scale. But like, I'm assuming you for your solution, I mean, yeah, Nick.
+
+425
+01:07:01.590 --> 01:07:05.020
+GBM01 09FL Buckingham (X52): I will. I will guess once you still be okay? How are you guys feeling?
+
+426
+01:07:05.730 --> 01:07:14.970
+GBM01 09FL Buckingham (X52): Yeah, I mean, like, like, we never, or like rarely trained full models. So we need to have them on the Gpu. But we we rarely train them all.
+
+427
+01:07:15.744 --> 01:07:25.555
+GBM01 09FL Buckingham (X52): I've also left test. So I think so. I mean your workflow. Yeah, so
+
+428
+01:07:26.250 --> 01:07:38.319
+GBM01 09FL Buckingham (X52): I think the idea is is great also include like having this also included somehow in AI studio, sounds sounds super interesting. But yeah, I think the the problem there was is that I'm like
+
+429
+01:07:38.420 --> 01:07:43.520
+GBM01 09FL Buckingham (X52): like that. We have local workstations. So we would just use them first, st and we
+
+430
+01:07:43.780 --> 01:07:55.870
+GBM01 09FL Buckingham (X52): rarely max them out so only like if we have like tons of customers at the same time coming, and it gets changed at all or no.
+
+431
+01:07:55.900 --> 01:07:57.530
+GBM01 09FL Buckingham (X52): if you want to, or
+
+432
+01:07:57.660 --> 01:08:07.549
+GBM01 09FL Buckingham (X52): like. No, because we interesting. No, between, because we only do the training there and then for the deployment, we, we use the cloud just because
+
+433
+01:08:07.720 --> 01:08:15.259
+GBM01 09FL Buckingham (X52): scalability wise, easier. Yeah. One of the things we're thinking about is especially as we try to integrate with more solutions
+
+434
+01:08:15.520 --> 01:08:16.970
+GBM01 09FL Buckingham (X52): standing up like.
+
+435
+01:08:17.060 --> 01:08:18.069
+GBM01 09FL Buckingham (X52): But other than
+
+436
+01:08:19.250 --> 01:08:35.289
+GBM01 09FL Buckingham (X52): local workstation, based like, who knows about the local micro services on the ticket off of our studio help potentially some of the performance issues that you experience but also help create a shared training environment or deployed environment for users.
+
+437
+01:08:35.410 --> 01:08:45.890
+GBM01 09FL Buckingham (X52): But is that something that would be interesting, too? I think. Just generally the idea of putting all compute in one platform and making it accessible all the same way. That is
+
+438
+01:08:46.180 --> 01:09:00.400
+GBM01 09FL Buckingham (X52): really interesting, cause I think that's a big headache of having like split, I know, because we use everything we use Google plug, we use azure. We use aws. So you have to access those differently. If you wanna if you want to train stuff, then we have like
+
+439
+01:09:01.160 --> 01:09:06.289
+GBM01 09FL Buckingham (X52): workstations which you also have to like manually access, like even be there physically.
+
+440
+01:09:06.651 --> 01:09:18.738
+GBM01 09FL Buckingham (X52): So having this, all in one spot is being like, Hey, this is free right now. Also, like, I mean, I'm normally at the office. So I'm always there, but also like to to get like other engineers on there like access it.
+
+441
+01:09:19.987 --> 01:09:42.229
+GBM01 09FL Buckingham (X52): So we got a big local custom. So they switch from cloud to on. Prem, and I like the idea why they switch.
+
+442
+01:09:42.529 --> 01:09:49.330
+GBM01 09FL Buckingham (X52): I'm not sure. Okay, I really don't know what the phone. But yeah, but it's hard. It's hard using it
+
+443
+01:09:49.569 --> 01:09:52.400
+GBM01 09FL Buckingham (X52): because they had to put everything that AI studio has.
+
+444
+01:09:52.630 --> 01:10:01.809
+GBM01 09FL Buckingham (X52): So they had to figure it out themselves. So there was a lot of switching around using cube flow or using others other software that the same thing. So
+
+445
+01:10:01.970 --> 01:10:04.150
+GBM01 09FL Buckingham (X52): right now it's working, but having a more
+
+446
+01:10:04.910 --> 01:10:07.879
+GBM01 09FL Buckingham (X52): centralized thing to just equip. Yes.
+
+447
+01:10:08.120 --> 01:10:33.294
+GBM01 09FL Buckingham (X52): but I'm not a fan of mixing on Prem and cloud. Nope, because working on large data sets means data sets are sort of in the cloud. You would always have to download them. And this is the huge bottleneck.
+
+448
+01:10:33.930 --> 01:10:35.960
+GBM01 09FL Buckingham (X52): So it's long there, right?
+
+449
+01:10:37.000 --> 01:10:47.889
+GBM01 09FL Buckingham (X52): It's mainly cost, I think. So. I think it's super sooner expensive to move those things. Yeah. And for you to access that local. So like any issues of like, Hey, like, I
+
+450
+01:10:47.940 --> 01:11:04.100
+GBM01 09FL Buckingham (X52): wait a line for other people using it, not right now, because it's not that many people using it. So there's just a handful of people using to use. So that's okay. But are they like a 100? I'm not sure it's not the A ones. It's the age.
+
+451
+01:11:04.300 --> 01:11:10.770
+GBM01 09FL Buckingham (X52): but the new one, the new one they did. We just released. Make sure we have all the H 100 something different.
+
+452
+01:11:11.862 --> 01:11:19.807
+GBM01 09FL Buckingham (X52): I'm just using. It would be a problem.
+
+453
+01:11:21.961 --> 01:11:39.790
+GBM01 09FL Buckingham (X52): And then your your deployments. Yeah. In my case, we I don't really work on deployment pipelines. But in my team, what we do is developing models locally, and if everything is fine, accuracy matrix, all, all stuff is fine, then we collaborate with that engineer.
+
+454
+01:11:40.030 --> 01:12:05.689
+GBM01 09FL Buckingham (X52): And today in my company, the deployments done through a Google platform. So that's what we use today. What we do is like we push our last version of the model on Github, and then they fork it from there so that we could always like change some stuff in the model they would always get.
+
+455
+01:12:05.690 --> 01:12:11.980
+GBM01 09FL Buckingham (X52): The last few days are the top. So that's okay. They use in the in the deployment.
+
+456
+01:12:12.800 --> 01:12:22.789
+GBM01 09FL Buckingham (X52): But I think deployment is always super custom, so would be enough for Ais to do to to just have this experimenting and logging into Emma flow. And that's it so
+
+457
+01:12:23.250 --> 01:12:24.950
+GBM01 09FL Buckingham (X52): clearly I haven't seen.
+
+458
+01:12:25.160 --> 01:12:30.910
+GBM01 09FL Buckingham (X52): I have seen a lot of deployment stuff, and every everyone's doing his own custom thing. Yeah.
+
+459
+01:12:32.390 --> 01:12:35.450
+GBM01 09FL Buckingham (X52): okay? So you don't think we need to do.
+
+460
+01:12:35.940 --> 01:12:48.739
+GBM01 09FL Buckingham (X52): I don't see that that's very complicated enough to be able to just do the local department just from a testing standpoint. But we're going to use a different. Yeah. Script the latest version from Mso posted somewhere in Spale.
+
+461
+01:12:49.030 --> 01:13:03.010
+GBM01 09FL Buckingham (X52): So when you do, the on-prem development is that on Prem, like on like a notebook like this, or what type of we have a local poster. We train malls. But obviously we start with local machines.
+
+462
+01:13:03.080 --> 01:13:09.150
+GBM01 09FL Buckingham (X52): and if everything is good, then we push it on the disclosure. We train it on.
+
+463
+01:13:09.560 --> 01:13:11.759
+GBM01 09FL Buckingham (X52): Want more data, let's say.
+
+464
+01:13:11.820 --> 01:13:26.229
+GBM01 09FL Buckingham (X52): and if matrix are fine, then the last version, and then they could just clone this for the deployment. But what also happening is in my company. Since our clients is business people.
+
+465
+01:13:26.360 --> 01:13:37.030
+GBM01 09FL Buckingham (X52): they are not that familiar with tech tools. What they already needs in there needs to file with, for example, recommendation or so on.
+
+466
+01:13:37.080 --> 01:13:42.499
+GBM01 09FL Buckingham (X52): So for those kind of project. What we did is to find a way
+
+467
+01:13:42.900 --> 01:14:07.220
+GBM01 09FL Buckingham (X52): that our model. We take their input data somewhere. It will be in one cloud somewhere, and then we run it with our models and then deploy it in their environments. And these are different environments. Basically, they use Microsoft tools and so on. So they always to gather, get their input files and then run it
+
+468
+01:14:07.380 --> 01:14:34.250
+GBM01 09FL Buckingham (X52): for our models. And then that's why there, I think, maybe yes, studio as a feature like this for us, because most of our project, I mean, is it built and maintained by your it team maintained by them. What's happened sometime? It's like it's crashed.
+
+469
+01:14:34.290 --> 01:14:38.909
+GBM01 09FL Buckingham (X52): So we have to exit them to fix or to run the cluster again
+
+470
+01:14:39.030 --> 01:14:45.227
+GBM01 09FL Buckingham (X52): because of memory issues, or whatever. So it's built by them, and they maintain.
+
+471
+01:14:45.860 --> 01:14:53.536
+GBM01 09FL Buckingham (X52): Do you feel they know about your requirements in terms of computes. We fight to get
+
+472
+01:14:54.540 --> 01:15:08.409
+GBM01 09FL Buckingham (X52): actually, we. We have to show them some use case, and why we already need to do this to get the resources. That's what we want. So if you were to kind of provide the requirement for the on-prem cluster, what would it look like
+
+473
+01:15:09.310 --> 01:15:11.920
+GBM01 09FL Buckingham (X52): in terms of resources.
+
+474
+01:15:12.060 --> 01:15:15.789
+GBM01 09FL Buckingham (X52): Yeah, I mean, let's say you want to do something for the ground, Beals.
+
+475
+01:15:16.632 --> 01:15:22.570
+GBM01 09FL Buckingham (X52): I'm not sure if I have the right answer for this. I know I'm just trying to like
+
+476
+01:15:22.580 --> 01:15:34.609
+GBM01 09FL Buckingham (X52): click below what's in the on from cluster right? It could be built with servers, workstations, you know, bunch of different things. So I'm just kind of trying to get a little bit more finer understanding.
+
+477
+01:15:35.030 --> 01:15:38.889
+GBM01 09FL Buckingham (X52): Yeah, to me, the the idea is to have
+
+478
+01:15:39.270 --> 01:15:40.990
+GBM01 09FL Buckingham (X52): most of the time we have
+
+479
+01:15:41.170 --> 01:15:50.923
+GBM01 09FL Buckingham (X52): projects are Nmp or computer vision projects. So the idea is really to have enough resources there. I'm not sure what's enough meat, but
+
+480
+01:15:53.210 --> 01:15:58.140
+GBM01 09FL Buckingham (X52): we are at time. So yeah, thank you guys, so much for the feedback.
+
+481
+01:15:58.430 --> 01:15:59.209
+GBM01 09FL Buckingham (X52): I'm off.
+
+482
+01:15:59.340 --> 01:16:02.679
+GBM01 09FL Buckingham (X52): It's great, and we have more session. So we'll be able to get more feedback.
+
+483
+01:16:02.800 --> 01:16:06.350
+GBM01 09FL Buckingham (X52): So there's you're gonna believe both.
+
+484
+01:16:06.600 --> 01:16:07.510
+GBM01 09FL Buckingham (X52): aren't you?
+
+485
+01:16:07.720 --> 01:16:10.270
+GBM01 09FL Buckingham (X52): Great? Thank you. And good job at that
+
+486
+01:16:10.470 --> 01:16:13.420
+GBM01 09FL Buckingham (X52): telecom. Alright, make a very nice you
+
+487
+01:16:13.750 --> 01:16:18.781
+GBM01 09FL Buckingham (X52): because it's from Zoom.
+
+488
+01:16:20.230 --> 01:16:21.480
+GBM01 09FL Buckingham (X52): their feet passing.
+
+489
+01:16:21.610 --> 01:16:45.985
+GBM01 09FL Buckingham (X52): I think Java was running a little bit differently. We just have the 2 the 2 splits per AI studio, but I think for Java.
+
+490
+01:16:47.300 --> 01:16:57.559
+GBM01 09FL Buckingham (X52): I don't know. I mean, I think that was where I lost track of like where they were talking about splitting that room into 2. That's what we were originally talking.
+
