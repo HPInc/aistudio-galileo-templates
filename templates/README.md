@@ -16,11 +16,11 @@ Also in this example, we illustrate how to work with
 
 ## Code Generation (code-generation-with-langchain.ipynb)
 
-This use case illustrate an example where the user access a git repository to serve as code reference. Some level of code understanding is used to index the available code from the repository. Based on this reference, the code generator uses in-cell prompts from the user in order to generate code in new notebook cells. 
+This use case illustrates an example where the user accesses a git repository to serve as code reference. Some level of code understanding is used to index the available code from the repository. Based on this reference, the code generator uses in-cell prompts from the user in order to generate code in new notebook cells. 
 
 ## Text Generation (code-generation-with-langchain.ipynb)
 
-This use case shows a process to search for a scientific paper in ArXiv, than generating a presentation based on the content of this paper.
+This use case shows a process to search for a scientific paper in ArXiv, then generating a presentation based on the content of this paper.
 
 # Different model alternatives
 
