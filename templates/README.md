@@ -21,3 +21,11 @@ This use case illustrate an example where the user access a git repository to se
 ## Text Generation (code-generation-with-langchain.ipynb)
 
 This use case shows a process to search for a scientific paper in ArXiv, than generating a presentation based on the content of this paper.
+
+# Different model alternatives
+
+In the given examples, we provide different ways to access your Large Language models - all of them supported by our pre-configured workspace. Among them, we include:
+* Access to OpenAI cloud API - Requires an API key from OpenAI
+* Access to Hugging Face cloud API - Requires an API key from Hugging Face
+* Access of Hugging Face models loaded locally, through transformer lib
+* Access to models downloaded locally, through LlamaCPP library -  requires the project to have an asset call Llama7b, associated with the cloud S3 URI s3://dsp-demo-bucket/LLMs (public bucket)
