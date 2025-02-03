@@ -29,3 +29,6 @@ In the given examples, we provide different ways to access your Large Language m
 * Access to Hugging Face cloud API - Requires an API key from Hugging Face
 * Access of Hugging Face models loaded locally, through transformer lib
 * Access to models downloaded locally, through LlamaCPP library -  requires the project to have an asset call Llama7b, associated with the cloud S3 URI s3://dsp-demo-bucket/LLMs (public bucket)
+
+# API Keys
+At the moment, the user needs to create a file called secrets.yaml, with entries for desired keys. Integration with Galileo depends on creating users API key in the user interface and saving locally in this file, with the key Galileo.
