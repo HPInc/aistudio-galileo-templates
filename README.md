@@ -22,6 +22,15 @@ This use case illustrates an example where the user accesses a git repository to
 
 This use case shows a process to search for a scientific paper in ArXiv, then generating a presentation based on the content of this paper.
 
+# Important notes when running these examples
+## API keys
+At the moment, the user needs to create a file called secrets.yaml, with entries for desired keys. Integration with Galileo depends on creating users API key in the user interface and saving locally in this file, with the key Galileo.
+
+## Resource issues
+Several users have found issues when running this experiment due to the models exceeding Memory/GPU usage. To run these examples, we strongly recommend an NVidia GPU with 16+ GB of VRAM. We also recommend at least 16GB of RAM. Moreover, even with good hardware, we also recommend never running more than one model simultaneously: For instance, after starting a model in a notebook, restart the kernel or stop the workspace before running another notebook or model deployment.
+
+## Network issues
+Whenever corporate networks restrict SSH connections, one may need to set up HTTPS proxy to connect to external APIs - in our examples, logging data in Galileo web service requires SSH. If this is the case, one can setup a `proxy` variable in the config.yaml file before running the experiment - this will allow all the API calls to use the correct proxy.
 # Different model alternatives
 
 In the given examples, we provide different ways to access your Large Language models - all of them supported by our pre-configured workspace. Among them, we include:
@@ -30,5 +39,3 @@ In the given examples, we provide different ways to access your Large Language m
 * Access of Hugging Face models loaded locally, through transformer lib
 * Access to models downloaded locally, through LlamaCPP library -  requires the project to have an asset call Llama7b, associated with the cloud S3 URI s3://dsp-demo-bucket/LLMs (public bucket)
 
-# API Keys
-At the moment, the user needs to create a file called secrets.yaml, with entries for desired keys. Integration with Galileo depends on creating users API key in the user interface and saving locally in this file, with the key Galileo.
