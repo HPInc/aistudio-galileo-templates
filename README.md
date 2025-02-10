@@ -31,11 +31,10 @@ Several users have found issues when running this experiment due to the models e
 
 ## Network issues
 Whenever corporate networks restrict SSH connections, one may need to set up HTTPS proxy to connect to external APIs - in our examples, logging data in Galileo web service requires SSH. If this is the case, one can setup a `proxy` variable in the config.yaml file before running the experiment - this will allow all the API calls to use the correct proxy.
+
 # Different model alternatives
 
-In the given examples, we provide different ways to access your Large Language models - all of them supported by our pre-configured workspace. Among them, we include:
-* Access to OpenAI cloud API - Requires an API key from OpenAI
-* Access to Hugging Face cloud API - Requires an API key from Hugging Face
-* Access of Hugging Face models loaded locally, through transformer lib
-* Access to models downloaded locally, through LlamaCPP library -  requires the project to have an asset call Llama7b, associated with the cloud S3 URI s3://dsp-demo-bucket/LLMs (public bucket)
-
+In the given examples, we provide different options as examples for  Large Language models - config.yaml file has a field *model_source*, which the user can choose between:
+    * **local**: Uses local llama2-7b model, loaded from S3 as an asset in AI Studio Project
+    * **hugging-face-local**: Downloads a deep-seek with 1.5B parameters and performs the inference locally
+    * **hugging-face-cloud**: Uses Hugging Face API to access a Mistral 7b model. Requires a Hugging Face key registered in secrets.yaml (key HuggingFace)
