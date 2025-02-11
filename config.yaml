@@ -1,2 +1,3 @@
-source: "OpenAI"
+#model_source can be either local, hugging-face-cloud and hugging-face-local
+model_source: "local"
 galileo_url: "https://console.hp.galileocloud.io/"
