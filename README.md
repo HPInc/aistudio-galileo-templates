@@ -32,6 +32,10 @@ Several users have found issues when running this experiment due to the models e
 ## Network issues
 Whenever corporate networks restrict SSH connections, one may need to set up HTTPS proxy to connect to external APIs - in our examples, logging data in Galileo web service requires SSH. If this is the case, one can setup a `proxy` variable in the config.yaml file before running the experiment - this will allow all the API calls to use the correct proxy.
 
+## Llama issues
+Some users have experienced issues related to the path not being found for the Llama7b model when running the experiments. If you experience this, first make sure that the model exists inside the workspace in the following location: `/home/jovyan/datafabric/Llama7b/ggml-model-f16-Q5_K_M.gguf`
+If the file is not present at that location, please download it from the assets screen inside of your project. The assets page can be accessed by going into your project and clicking on the 'Assets' tab. Once here, click on the download button next to the Llama7b model in the assets list, which should take a few minutes to complete. Afterwards, restart the workspace and check the path above to see if the model was downloaded successfully.
+
 # Different model alternatives
 
 In the given examples, we provide different options as examples for  Large Language models - config.yaml file has a field *model_source*, which the user can choose between:
