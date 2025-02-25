@@ -1,0 +1,5 @@
+#model_source can be either local, tensorrt, hugging-face-cloud and hugging-face-local
+model_source: "tensorrt"
+galileo_url: "https://console.hp.galileocloud.io/"
+#proxy is used to setup HTTPS_PROXY environment variable when necessary 
+proxy: "http://web-proxy.austin.hp.com:8080"
