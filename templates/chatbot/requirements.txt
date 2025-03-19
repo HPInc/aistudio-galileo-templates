@@ -1,0 +1,17 @@
+PyPDF
+langchain
+langchain_community
+langchain_core
+langchain_huggingface
+langchain-text-splitters
+transformers
+pyyaml
+httpx==0.27.2
+tokenizers>=0.20.0
+galileo_protect
+galileo_observe
+promptquality
+mlflow
+pandas
+numpy
+chroma-db
