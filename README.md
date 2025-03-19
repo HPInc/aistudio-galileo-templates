@@ -40,7 +40,7 @@ In this simpler example, we implement a basic chatbot assistant to AI Studio, by
 
 ### Summarization (templates/summarization/summarization-with-langchain.ipynb)
 
-For this use case, we extend the basic scenario to include more complex pre-processing of the input. In our scenario, we break an original transcript (which might be too long) into smaller topics (chunks with semantic relevance). A chain is then built to summarize the chunks --in parallel--, then joining them into a single summary in the end.
+For this use case, we extend the basic scenario to include more complex pre-processing of the input. In our scenario, we break an original transcript (which might be too long) into smaller topics (chunks with semantic relevance). A chain is then built to summarize the chunks ~~in parallel~~, then joining them into a single summary in the end.
 
 Also in this example, we illustrate how to work with:
 * Personalized runs from Galileo (using EvaluateRuns)
