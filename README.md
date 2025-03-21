@@ -17,26 +17,30 @@ The repository is organized into the following structure:
 │    ├── data/                  # Specific data files for the chatbot example
 │    │    └── AIStudioDoc.pdf   # Documentation used for the RAG pipeline
 │    ├── notebooks/             # Contains the notebook files
-│    │    ├── chatbot-with-langchain.ipynb
-│    │    └── requirements.txt
-│    └── demo/                  # UI demo output and source code
+│    │    └── chatbot-with-langchain.ipynb   
+│    ├── demo/                  # UI demo output and source code
+│    ├── README.md             # Detailed documentation for the chatbot example
+│    └── requirements.txt       # Dependencies for the chatbot example
 │
 ├── 01-summarization-with-langchain/  # Summarization template
 │    ├── data/                  # Specific data files for the summarization example
 │    │    ├── I_have_a_dream.txt
 │    │    └── I_have_a_dream.vtt
-│    └── notebooks/
-│         ├── summarization-with-langchain.ipynb
-│         └── requirements.txt
+│    ├── notebooks/             # Contains the notebook files
+│    │    └── summarization-with-langchain.ipynb
+│    ├── README.md             # Detailed documentation for the summarization example
+│    └── requirements.txt       # Dependencies for the summarization example
 │
 ├── 02-code-generation-with-langchain/  # Code generation template
-│    └── notebooks/
-│         └── code-generation-with-langchain.ipynb
+│    ├── notebooks/             # Contains the notebook files
+│    │    └── code-generation-with-langchain.ipynb
+│    └── README.md             # Detailed documentation for the code generation example
 │
 └── 03-text-generation-with-langchain/  # Text generation template
-     └── notebooks/
-          ├── text-generation-with-langchain.ipynb
-          └── requirements.txt
+     ├── notebooks/             # Contains the notebook files
+     │    └── text-generation-with-langchain.ipynb
+     ├── README.md             # Detailed documentation for the text generation example
+     └── requirements.txt       # Dependencies for the text generation example
 ```
 
 ## Available Templates
