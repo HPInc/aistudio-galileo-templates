@@ -77,10 +77,10 @@ This file contains your API keys and other sensitive credentials required to run
 
 ```yaml
 # Galileo API key (required for all examples)
-Galileo: "your_galileo_api_key_here"
+GALILEO_API_KEY: "your_galileo_api_key_here"
 
 # HuggingFace API key (required only if using hugging-face-cloud model source)
-HuggingFace: "your_huggingface_api_key_here"
+HUGGINGFACE_API_KEY: "your_huggingface_api_key_here"
 
 # Add any other keys needed for additional services
 ```
