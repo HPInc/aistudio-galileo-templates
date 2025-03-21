@@ -11,17 +11,20 @@ The repository is organized into the following structure:
 │    ├── config.yaml            # Configuration settings
 │    └── secrets.yaml           # API keys (gitignored, you must create this file and fill with the necessary API keys)
 │
-├── data/                       # Shared data files
-│
-├── utils/                      # Common utility functions and shared code between notebooks
+├── src/                      # Common utility functions and shared code between notebooks
 │
 ├── 00-chatbot-with-langchain/  # Chatbot template
+│    ├── data/                  # Specific data files for the chatbot example
+│    │    └── AIStudioDoc.pdf   # Documentation used for the RAG pipeline
 │    ├── notebooks/             # Contains the notebook files
 │    │    ├── chatbot-with-langchain.ipynb
 │    │    └── requirements.txt
 │    └── demo/                  # UI demo output and source code
 │
 ├── 01-summarization-with-langchain/  # Summarization template
+│    ├── data/                  # Specific data files for the summarization example
+│    │    ├── I_have_a_dream.txt
+│    │    └── I_have_a_dream.vtt
 │    └── notebooks/
 │         ├── summarization-with-langchain.ipynb
 │         └── requirements.txt
