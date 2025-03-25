@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import List, Optional
 from langchain.prompts import ChatPromptTemplate
 from langchain.chat_models.base import BaseChatModel
@@ -19,23 +20,19 @@ class ScientificPaperAnalyzer:
         prompt_template: Optional[ChatPromptTemplate] = None,
         logging_enabled: bool = False
     ):
-        """
-        Initializes the class with a retriever, an LLM, and an optional prompt template.
-
-        Args:
-            retriever (VectorStoreRetriever): Retriever with get_relevant_documents method.
-            llm (BaseChatModel): Language model instance.
-            prompt_template (ChatPromptTemplate, optional): Custom prompt template. Uses default if None.
-            logging_enabled (bool): If True, enables logging output.
-        """
         self.retriever = retriever
         self.llm = llm
         self.prompt_template = prompt_template or self._default_prompt()
         self.logger = logging.getLogger(__name__)
         self.logging_enabled = logging_enabled
 
+        # Detect automatically if the LLM might be DeepSeek (heuristic)
+        self.is_deepseek = "deepseek" in str(type(llm)).lower()
+
         if logging_enabled:
             logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+            if self.is_deepseek:
+                self.logger.info("Auto-detected DeepSeek model.")
         else:
             logging.disable(logging.CRITICAL)
 
@@ -75,13 +72,70 @@ Here is the paper you will be analyzing:
             "question": RunnablePassthrough()
         } | self.prompt_template | self.llm | StrOutputParser()
 
+    
+
+    def _clean_deepseek_output(self, text: str) -> str:
+        """
+        Removes repeated prompt or dictionary-like structures 
+        specifically for DeepSeek outputs.
+        """
+        pattern = r"(?s)Human:.*?Question:\s*\{.*?\}\s*"
+        cleaned = re.sub(pattern, "", text)
+
+        steps_pattern = r"(?s)1\.\s*Read the step.*?subject matter\.\s*"
+        cleaned = re.sub(steps_pattern, "", cleaned)
+
+        return cleaned.strip()
+
+    def _clean_generic_output(self, text: str) -> str:
+        """
+        For non-DeepSeek models:
+        1) Remove 'Response:' prefix se existir
+        2) Remove duplicações exatas de linhas consecutivas
+        """
+        lines = text.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            line_no_response = re.sub(r"^Response:\s*", "", line.strip())
+            cleaned_lines.append(line_no_response)
+
+        deduped = []
+        for line in cleaned_lines:
+            if not deduped or line.strip() != deduped[-1].strip():
+                deduped.append(line)
+        final_text = "\n".join(deduped).strip()
+
+        return final_text
+
+    
+
     def analyze(self, question: str) -> str:
+        """
+        Executes the chain and returns only the final answer text,
+        removing repeated context or duplication as needed.
+        """
         if self.logging_enabled:
             self.logger.info(f"Analyzing question: '{question}'")
+
         result = self.chain.invoke({"query": question, "question": question})
+
+        if isinstance(result, dict) and "text" in result:
+            result = result["text"]
+        else:
+            result = str(result)
+
+        result = result.strip()
+
+        if self.is_deepseek:
+            cleaned = self._clean_deepseek_output(result)
+        else:
+            cleaned = self._clean_generic_output(result)
+
         if self.logging_enabled:
             self.logger.info("Chain execution completed.")
-        return result
+            self.logger.info(f"Final cleaned response: {cleaned[:300]}...")
+
+        return cleaned
 
     def get_chain(self) -> Runnable:
         """
