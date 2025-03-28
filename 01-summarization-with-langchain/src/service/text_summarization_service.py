@@ -138,3 +138,58 @@ class TextSummarizationService(BaseGenerativeService):
         
         # Return the result as a DataFrame with a summary column
         return pd.DataFrame([{"summary": result}])
+        
+    @classmethod
+    def log_model(cls, secrets_path, config_path, model_path=None):
+        """
+        Log the model to MLflow.
+        
+        Args:
+            secrets_path: Path to the secrets file
+            config_path: Path to the configuration file
+            model_path: Path to the model file (optional)
+            
+        Returns:
+            None
+        """
+        import mlflow
+        from mlflow.models.signature import ModelSignature
+        from mlflow.types.schema import Schema, ColSpec
+        
+        # Define model input/output schema
+        input_schema = Schema([
+            ColSpec("string", "text")
+        ])
+        output_schema = Schema([
+            ColSpec("string", "summary")
+        ])
+        signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+        
+        # Prepare artifacts
+        artifacts = {
+            "secrets": secrets_path,
+            "config": config_path
+        }
+        
+        if model_path:
+            artifacts["model"] = model_path
+        
+        # Log model to MLflow
+        mlflow.pyfunc.log_model(
+            artifact_path="text_summarization_service",
+            python_model=cls(),
+            artifacts=artifacts,
+            signature=signature,
+            pip_requirements=[
+                "galileo-protect==0.15.1",
+                "galileo-observe==1.13.2",
+                "pyyaml",
+                "pandas",
+                "sentence-transformers",
+                "langchain_core",
+                "langchain_huggingface",
+                "tokenizers>=0.13.0",
+                "httpx>=0.24.0",
+            ]
+        )
+        print("Model and artifacts successfully registered in MLflow.")

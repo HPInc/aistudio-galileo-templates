@@ -165,39 +165,57 @@ Question: {query}
             return {"result": error_message}
     
     @classmethod
-    def log_model(cls, model_folder: str, pip_requirements=None):
+    def log_model(cls, secrets_path, config_path, model_path=None):
         """
-        Log the model to MLflow with appropriate configuration.
+        Log the model to MLflow.
         
         Args:
-            model_folder: Path to the model folder
-            pip_requirements: List of pip requirements for the model
+            secrets_path: Path to the secrets file
+            config_path: Path to the configuration file
+            model_path: Path to the model file (optional)
+            
+        Returns:
+            None
         """
         import mlflow
-        from mlflow.models import ModelSignature
+        from mlflow.models.signature import ModelSignature
         from mlflow.types.schema import Schema, ColSpec
         
-        # Define the input and output schemas
-        input_schema = Schema([ColSpec("string", "question")])
-        output_schema = Schema([ColSpec("string", "result")])
+        # Define model input/output schema
+        input_schema = Schema([
+            ColSpec("string", "query"),
+            ColSpec("string", "question")
+        ])
+        output_schema = Schema([
+            ColSpec("string", "generated_code")
+        ])
         signature = ModelSignature(inputs=input_schema, outputs=output_schema)
         
-        # Default pip requirements
-        if pip_requirements is None:
-            pip_requirements = [
-                "mlflow==2.9.2", 
-                "langchain", 
-                "promptquality", 
-                "galileo-protect", 
-                "chromadb"
-            ]
+        # Prepare artifacts
+        artifacts = {
+            "secrets": secrets_path,
+            "config": config_path
+        }
         
-        # Log the model to MLflow
-        artifacts = {"models": model_folder}
+        if model_path:
+            artifacts["models"] = model_path
+        
+        # Log model to MLflow
         mlflow.pyfunc.log_model(
-            artifact_path="CodeGeneration_Service",
+            artifact_path="code_generation_service",
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
-            pip_requirements=pip_requirements,
+            pip_requirements=[
+                "mlflow==2.9.2", 
+                "langchain", 
+                "promptquality", 
+                "galileo-protect==0.15.1", 
+                "galileo-observe==1.13.2",
+                "chromadb",
+                "langchain_core",
+                "langchain_huggingface",
+                "pyyaml"
+            ]
         )
+        print("Model and artifacts successfully registered in MLflow.")
