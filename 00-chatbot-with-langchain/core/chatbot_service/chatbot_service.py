@@ -515,6 +515,7 @@ class ChatbotService(BaseGenerativeService):
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
+            code_paths=["core"],
             pip_requirements=[
                 "PyPDF",
                 "pyyaml",
