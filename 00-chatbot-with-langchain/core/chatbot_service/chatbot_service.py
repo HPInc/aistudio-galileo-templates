@@ -25,8 +25,8 @@ from galileo_protect import ProtectParser
 import sys
 import os
 # Add the src directory to the path to import base_service
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
-from service.base_service import BaseGenerativeService
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+from src.service.base_service import BaseGenerativeService
 
 def format_docs(docs: List[Document]) -> str:
     """
@@ -515,7 +515,7 @@ class ChatbotService(BaseGenerativeService):
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
-            code_paths=["core"],
+            code_paths=["../core", "../../src"],
             pip_requirements=[
                 "PyPDF",
                 "pyyaml",

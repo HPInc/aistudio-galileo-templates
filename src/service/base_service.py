@@ -38,8 +38,8 @@ class BaseGenerativeService(PythonModel):
         Returns:
             Dictionary containing the loaded configuration
         """
-        config_path = os.path.join(context._artifacts_dir, "config")
-        secrets_path = os.path.join(context._artifacts_dir, "secrets")
+        config_path = context.artifacts["config"]
+        secrets_path = context.artifacts["secrets"]
         
         # Load configuration
         if os.path.exists(config_path):
