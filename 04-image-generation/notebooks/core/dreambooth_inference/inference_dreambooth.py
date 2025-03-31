@@ -6,6 +6,8 @@ import numpy as np
 from PIL import Image
 import yaml
 from typing import List, Union
+from pathlib import Path
+import os
 
 class StableDiffusionPipelineOutput:
     def __init__(self, images: Union[List[Image.Image], np.ndarray], nsfw_content_detected: List[bool]):
@@ -14,15 +16,17 @@ class StableDiffusionPipelineOutput:
 
 def load_config():
     num_gpus = torch.cuda.device_count()
+
     if num_gpus >= 2:
-        config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config_multi-gpu.yaml"
+        config_file = os.path.join("..", "data", "config", "default_config_multi-gpu.yaml")
         print(f"Detected {num_gpus} GPUs, using {config_file}")
     else:
-        config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config_one-gpu.yaml"
+        config_file = os.path.join("..", "data", "config", "default_config_one-gpu.yaml")
         print(f"Detected {num_gpus} GPU, using {config_file}")
-    
+
     with open(config_file, 'r') as file:
         config = yaml.safe_load(file)
+
     return config
 
 def get_max_memory_per_gpu():

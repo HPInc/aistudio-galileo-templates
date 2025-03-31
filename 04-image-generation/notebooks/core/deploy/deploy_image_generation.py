@@ -23,13 +23,13 @@ class ImageGenerationModel(mlflow.pyfunc.PythonModel):
 
         self.num_gpus = torch.cuda.device_count()
         if self.num_gpus >= 2:
-            config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config_multi-gpu.yaml"
+            config_file = "../../data/config/default_config_multi-gpu.yaml"
             logging.info(f"Detected {self.num_gpus} GPUs, using multi-GPU configuration: {config_file}")
         elif self.num_gpus == 1:
-            config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config_one-gpu.yaml"
+            config_file = "../../data/config/default_config_one-gpu.yaml"
             logging.info(f"1 GPU detected, using single-GPU configuration: {config_file}")
         else:
-            config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config-cpu.yaml"
+            config_file = "../../data/config/default_config-cpu.yaml"
             logging.info("No GPU detected, using CPU configuration.")
         self.current_pipeline = None
         self.current_model = None
@@ -155,13 +155,13 @@ def setup_accelerate():
     subprocess.run(["pip", "install", "accelerate"], check=True)
     num_gpus = torch.cuda.device_count()
     if num_gpus >= 2:
-        config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config_multi-gpu.yaml"
+        config_file = "../../data/config/default_config_multi-gpu.yaml"
         logging.info("Using multi-GPU configuration with %d GPUs.", num_gpus)
     elif num_gpus == 1:
-        config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config_one-gpu.yaml"
+        config_file = "../../data/config/default_config_one-gpu.yaml"
         logging.info("Using single-GPU configuration with 1 GPU.")
     else:
-        config_file = "/home/jovyan/GenAI-Demos/Stable-Diffusion/config/default_config-cpu.yaml"
+        config_file = "../../data/config/default_config-cpu.yaml"
         logging.info("No GPU detected, using CPU configuration.")
     os.environ['ACCELERATE_CONFIG_FILE'] = config_file
 
@@ -169,7 +169,7 @@ def deploy_model():
     setup_accelerate()
     mlflow.set_experiment(experiment_name='ImageGeneration')
     finetuned_model_path = "./dreambooth"
-    model_no_finetuning_path = "/home/jovyan/local/stable-diffusion-2-1/"
+    model_no_finetuning_path = "../../../local/stable-diffusion-2-1/"
     with mlflow.start_run(run_name='image_generation_service') as run:
         logging.info("Run started: %s", run.info.run_id)
         mlflow.log_artifact(os.environ['ACCELERATE_CONFIG_FILE'], artifact_path="accelerate_config")
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     mlflow.set_experiment(experiment_name='ImageGeneration')
     logging.info("Experiment 'ImageGeneration' configured.")
     finetuned_model_path = "./dreambooth"
-    model_no_finetuning_path = "/home/jovyan/local/stable-diffusion-2-1/"
+    model_no_finetuning_path = "../../../local/stable-diffusion-2-1/"
     with mlflow.start_run(run_name='image_generation_service') as run:
         logging.info("Run started: %s", run.info.run_id)
         mlflow.log_artifact(os.environ['ACCELERATE_CONFIG_FILE'], artifact_path="accelerate_config")

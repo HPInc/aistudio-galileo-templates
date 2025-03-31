@@ -1,3 +1,4 @@
+diffusers
 setuptools
 packaging
 accelerate
@@ -9,7 +10,6 @@ Jinja2
 peft==0.7.0
 huggingface-hub
 pydantic
-mlflow-skinny==2.3.2
 deepspeed==0.15.1
 tensorflow
 
