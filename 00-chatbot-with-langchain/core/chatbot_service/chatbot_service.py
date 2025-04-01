@@ -6,6 +6,7 @@ Galileo integration for protection, observation, and evaluation.
 import os
 import uuid
 import base64
+import logging
 from typing import Dict, Any, List
 import pandas as pd
 from langchain_community.document_loaders import PyPDFLoader
@@ -13,7 +14,7 @@ from langchain_community.llms import LlamaCpp
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline, HuggingFaceEndpoint
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough, RunnableLambda, RunnableMap
@@ -27,6 +28,9 @@ import os
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 def format_docs(docs: List[Document]) -> str:
     """
@@ -103,7 +107,7 @@ class ChatbotService(BaseGenerativeService):
         Args:
             context: MLflow model context containing artifacts
         """
-        print("[INFO] Initializing local LlamaCpp model.")
+        logger.info("Initializing local LlamaCpp model.")
         model_path = self.model_config.get("local_model_path", context.artifacts.get("models", ""))
 
         if not os.path.exists(model_path):
@@ -123,7 +127,7 @@ class ChatbotService(BaseGenerativeService):
             streaming=False,
             temperature=0.2,
         )
-        print("Using the local LlamaCpp model.")
+        logger.info("Using the local LlamaCpp model.")
 
     def load_local_hf_model(self, context):
         """
@@ -137,7 +141,7 @@ class ChatbotService(BaseGenerativeService):
         model = AutoModelForCausalLM.from_pretrained(model_id)
         pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=100, device=0)
         self.llm = HuggingFacePipeline(pipeline=pipe)        
-        print("Using the local Deep Seek model downloaded from HuggingFace.")
+        logger.info("Using the local Deep Seek model downloaded from HuggingFace.")
 
     def load_cloud_hf_model(self, context):
         """
@@ -150,7 +154,7 @@ class ChatbotService(BaseGenerativeService):
             huggingfacehub_api_token=self.model_config["hf_key"],
             repo_id="mistralai/Mistral-7B-Instruct-v0.2",
         )     
-        print("Using the cloud Mistral model on HuggingFace.")
+        logger.info("Using the cloud Mistral model on HuggingFace.")
 
     def load_vector_database(self):
         """
@@ -163,9 +167,11 @@ class ChatbotService(BaseGenerativeService):
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"The file 'AIStudioDoc.pdf' was not found at: {pdf_path}")
 
-        print(f"Reading and processing the PDF file: {pdf_path}")
+        logger.info(f"Reading and processing the PDF file: {pdf_path}")
 
         try:
+            # Load PDF documents
+            logger.info("Loading PDF data...")
             pdf_loader = PyPDFLoader(pdf_path)
             pdf_data = pdf_loader.load()
 
@@ -174,17 +180,31 @@ class ChatbotService(BaseGenerativeService):
                 if not isinstance(doc.page_content, str):
                     doc.page_content = str(doc.page_content)
 
+            # Split documents into chunks
+            logger.info("Splitting documents into chunks...")
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
             splits = text_splitter.split_documents(pdf_data)
-            print(f"PDF split into {len(splits)} parts.")
+            logger.info(f"PDF split into {len(splits)} parts.")
 
-            self.embedding = HuggingFaceEmbeddings()
+            logger.info("Initializing embedding model...")
+            try:
+                self.embedding = HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/all-mpnet-base-v2",
+                    cache_folder="/tmp/hf_cache"
+                )
+                logger.info("Embedding model loaded successfully.")
+            except Exception as emb_error:
+                logger.error(f"Error loading embedding model: {emb_error}")
+                raise
+
+            # Create vector database
+            logger.info("Creating vector database...")
             self.vectordb = Chroma.from_documents(documents=splits, embedding=self.embedding)
             self.retriever = self.vectordb.as_retriever()
 
-            print("Vector database created successfully.")
+            logger.info("Vector database created successfully.")
         except Exception as e:
-            print(f"Error creating vector database: {e}")
+            logger.error(f"Error creating vector database: {e}")
             raise
 
     def load_prompt(self) -> None:
@@ -240,9 +260,9 @@ class ChatbotService(BaseGenerativeService):
             self.setup_protection()
             self.setup_monitoring()
 
-            print(f"{self.__class__.__name__} successfully loaded and configured.")
+            logger.info(f"{self.__class__.__name__} successfully loaded and configured.")
         except Exception as e:
-            print(f"Error loading context: {e}")
+            logger.error(f"Error loading context: {e}")
             raise
 
     def add_pdf(self, base64_pdf):
@@ -398,7 +418,7 @@ class ChatbotService(BaseGenerativeService):
             }
         except Exception as e:
             error_msg = f"Error processing query: {str(e)}"
-            print(error_msg)
+            logger.error(error_msg)
             return {
                 "chunks": [],
                 "history": [],
@@ -523,4 +543,4 @@ class ChatbotService(BaseGenerativeService):
                 "httpx>=0.24.0",
             ]
         )
-        print("Model and artifacts successfully registered in MLflow.")
+        logger.info("Model and artifacts successfully registered in MLflow.")
