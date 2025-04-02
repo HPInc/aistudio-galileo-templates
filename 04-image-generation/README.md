@@ -1,4 +1,4 @@
-# Imagem generation with Dreambooth
+# DreamBooth Inference with Stable Diffusion 2.1
 
 ### Content
 - Overview
