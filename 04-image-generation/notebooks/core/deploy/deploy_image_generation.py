@@ -23,13 +23,13 @@ class ImageGenerationModel(mlflow.pyfunc.PythonModel):
 
         self.num_gpus = torch.cuda.device_count()
         if self.num_gpus >= 2:
-            config_file = "../data/config/default_config_multi-gpu.yaml"
+            config_file = "config/default_config_multi-gpu.yaml"
             logging.info(f"Detected {self.num_gpus} GPUs, using multi-GPU configuration: {config_file}")
         elif self.num_gpus == 1:
-            config_file = "../data/config/default_config_one-gpu.yaml"
+            config_file = "config/default_config_one-gpu.yaml"
             logging.info(f"1 GPU detected, using single-GPU configuration: {config_file}")
         else:
-            config_file = "../data/config/config/default_config-cpu.yaml"
+            config_file = "config/config/default_config-cpu.yaml"
             logging.info("No GPU detected, using CPU configuration.")
         self.current_pipeline = None
         self.current_model = None
@@ -155,10 +155,10 @@ def setup_accelerate():
     subprocess.run(["pip", "install", "accelerate"], check=True)
     num_gpus = torch.cuda.device_count()
     if num_gpus >= 2:
-        config_file = "../data/config/default_config_multi-gpu.yaml"
+        config_file = "config/default_config_multi-gpu.yaml"
         logging.info("Using multi-GPU configuration with %d GPUs.", num_gpus)
     elif num_gpus == 1:
-        config_file = "../data/config/default_config_one-gpu.yaml"
+        config_file = "config/default_config_one-gpu.yaml"
         logging.info("Using single-GPU configuration with 1 GPU.")
     else:
         config_file = "../data/config/default_config-cpu.yaml"
