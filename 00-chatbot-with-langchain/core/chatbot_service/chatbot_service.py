@@ -25,6 +25,7 @@ from galileo_protect import ProtectParser
 # Import base service class from the shared location
 import sys
 import os
+
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
