@@ -6,6 +6,7 @@ and integrates with Galileo for protection, observation, and evaluation.
 """
 
 import os
+import logging
 from typing import Dict, Any, List
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
@@ -25,6 +26,9 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
 from service.base_service import BaseGenerativeService
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
 class CodeGenerationService(BaseGenerativeService):
     """Code Generation Service that extends the BaseGenerativeService."""
 
@@ -42,15 +46,18 @@ class CodeGenerationService(BaseGenerativeService):
             persist_directory: Directory to store vector database
         """
         try:
+            logger.info(f"Loading vector store from {persist_directory}")
             self.vector_store = Chroma(persist_directory=persist_directory)
             self.retriever = self.vector_store.as_retriever()
-            print(f"Vector store loaded from {persist_directory}")
+            logger.info(f"Vector store successfully loaded from {persist_directory}")
         except Exception as e:
-            print(f"Error loading vector store: {e}")
+            logger.error(f"Error loading vector store: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.info("Creating new empty vector store")
             # Create an empty vector store if loading fails
             self.vector_store = Chroma()
             self.retriever = self.vector_store.as_retriever()
-            print("Created new empty vector store")
+            logger.info("Created new empty vector store")
     
     def load_model(self, context) -> None:
         """
@@ -59,12 +66,29 @@ class CodeGenerationService(BaseGenerativeService):
         Args:
             context: MLflow model context containing artifacts
         """
-        model_source = self.model_config.get("model_source", "local")
-        
-        if model_source == "local":
-            self.load_local_model(context)
-        else:
-            raise ValueError(f"Unsupported model source: {model_source}. Currently only 'local' is supported for code generation.")
+        try:
+            model_source = self.model_config.get("model_source", "local")
+            logger.info(f"Attempting to load model from source: {model_source}")
+            
+            if model_source == "local":
+                logger.info("Using local LlamaCpp model source")
+                self.load_local_model(context)
+            else:
+                error_msg = f"Unsupported model source: {model_source}. Currently only 'local' is supported for code generation."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+                
+            if self.llm is None:
+                logger.error("Model failed to initialize - llm is None after loading")
+                raise RuntimeError("Model initialization failed - llm is None")
+                
+            logger.info(f"Model of type {type(self.llm).__name__} loaded successfully")
+        except Exception as e:
+            logger.error(f"Error loading model: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def load_local_model(self, context):
         """
@@ -73,28 +97,55 @@ class CodeGenerationService(BaseGenerativeService):
         Args:
             context: MLflow model context containing artifacts
         """
-        model_path = context.artifacts.get("models", None)
-        
-        if not model_path or not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found at {model_path}")
-        
-        self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-        
-        print(f"[INFO] Initializing local LlamaCpp model from {model_path}.")
-        self.llm = LlamaCpp(
-            model_path=model_path,
-            n_gpu_layers=30,
-            n_batch=512,
-            n_ctx=4096,
-            max_tokens=1024,
-            f16_kv=True,
-            callback_manager=self.callback_manager,
-            verbose=False,
-            stop=[],
-            streaming=False,
-            temperature=0.2,
-        )
-        print("Using local LlamaCpp model for code generation.")
+        try:
+            logger.info("Initializing local LlamaCpp model.")
+            model_path = context.artifacts.get("models", None)
+            
+            logger.info(f"Model path: {model_path}")
+            
+            if not model_path or not os.path.exists(model_path):
+                logger.error(f"Model file not found at: {model_path}")
+                raise FileNotFoundError(f"The model file was not found at: {model_path}")
+            
+            logger.info(f"Model file exists. Size: {os.path.getsize(model_path) / (1024 * 1024):.2f} MB")
+            
+            logger.info("Setting up callback manager")
+            self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+            
+            logger.info("Initializing LlamaCpp with the following parameters:")
+            logger.info(f"  - Model Path: {model_path}")
+            logger.info(f"  - n_gpu_layers: 30, n_batch: 512, n_ctx: 4096")
+            logger.info(f"  - max_tokens: 1024, f16_kv: True, temperature: 0.2")
+            
+            try:
+                self.llm = LlamaCpp(
+                    model_path=model_path,
+                    n_gpu_layers=30,
+                    n_batch=512,
+                    n_ctx=4096,
+                    max_tokens=1024,
+                    f16_kv=True,
+                    callback_manager=self.callback_manager,
+                    verbose=False,
+                    stop=[],
+                    streaming=False,
+                    temperature=0.2,
+                )
+                logger.info("LlamaCpp model initialized successfully.")
+            except Exception as model_error:
+                logger.error(f"Failed to initialize LlamaCpp model: {str(model_error)}")
+                logger.error(f"Exception type: {type(model_error).__name__}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
+                
+            logger.info("Using local LlamaCpp model for code generation.")
+        except Exception as e:
+            logger.error(f"Error in load_local_model: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def load_prompt(self) -> None:
         """Load the prompt template for code generation."""
@@ -122,14 +173,28 @@ Question: {query}
     
     def load_chain(self) -> None:
         """Create the code generation chain using the loaded model, prompt, and retriever."""
-        # Load the vector store first
-        self.load_vector_store()
-        
-        # Create the chain
-        self.chain = {
-            "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["question"])),
-            "query": RunnablePassthrough()
-        } | self.prompt | self.llm | StrOutputParser()
+        try:
+            # Load the vector store first
+            logger.info("Loading vector store for retrieval")
+            self.load_vector_store()
+            
+            if not self.retriever:
+                logger.error("Retriever is not initialized")
+                raise ValueError("Retriever must be initialized before creating the chain")
+                
+            logger.info("Creating code generation chain")
+            # Create the chain
+            self.chain = {
+                "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["question"])),
+                "query": RunnablePassthrough()
+            } | self.prompt | self.llm | StrOutputParser()
+            logger.info("Code generation chain created successfully")
+        except Exception as e:
+            logger.error(f"Error creating code generation chain: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def predict(self, context, model_input):
         """
@@ -145,23 +210,28 @@ Question: {query}
         question = model_input.get("question", "")
         
         if not question:
+            logger.warning("No question provided for code generation")
             return {"result": "Error: No question provided for code generation."}
         
         try:
+            logger.info(f"Processing code generation request: {question[:50]}...")
             # Run the protected chain with monitoring
             result = self.protected_chain.invoke(
                 {"input": question, "output": ""},
                 config={"callbacks": [self.prompt_handler]}
             )
-            print("Code generation processed successfully.")
+            logger.info("Code generation processed successfully")
             
             # Clean up the result (remove markdown code blocks if present)
             clean_code = result.replace("```python", "").replace("```", "").strip()
             
             return {"result": clean_code}
         except Exception as e:
-            error_message = f"Error processing code generation: {e}"
-            print(error_message)
+            error_message = f"Error processing code generation: {str(e)}"
+            logger.error(error_message)
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {"result": error_message}
     
     @classmethod
@@ -218,4 +288,4 @@ Question: {query}
                 "pyyaml"
             ]
         )
-        print("Model and artifacts successfully registered in MLflow.")
+        logger.info("Model and artifacts successfully registered in MLflow.")
