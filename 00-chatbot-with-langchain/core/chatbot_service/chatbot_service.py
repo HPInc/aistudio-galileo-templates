@@ -89,16 +89,35 @@ class ChatbotService(BaseGenerativeService):
         Args:
             context: MLflow model context containing artifacts
         """
-        model_source = self.model_config.get("model_source", "local")
+        try:
+            model_source = self.model_config.get("model_source", "local")
+            logger.info(f"Attempting to load model from source: {model_source}")
 
-        if model_source == "local":
-            self.load_local_model(context)
-        elif model_source == "hugging-face-local":
-            self.load_local_hf_model(context)
-        elif model_source == "hugging-face-cloud":
-            self.load_cloud_hf_model(context)
-        else:
-            raise ValueError(f"Unsupported model source: {model_source}")
+            if model_source == "local":
+                logger.info("Using local LlamaCpp model source")
+                self.load_local_model(context)
+            elif model_source == "hugging-face-local":
+                logger.info("Using local Hugging Face model source")
+                self.load_local_hf_model(context)
+            elif model_source == "hugging-face-cloud":
+                logger.info("Using cloud Hugging Face model source")
+                self.load_cloud_hf_model(context)
+            else:
+                logger.error(f"Unsupported model source: {model_source}")
+                raise ValueError(f"Unsupported model source: {model_source}")
+                
+            if self.llm is None:
+                logger.error("Model failed to initialize - llm is None after loading")
+                raise RuntimeError("Model initialization failed - llm is None")
+                
+            logger.info(f"Model of type {type(self.llm).__name__} loaded successfully")
+            
+        except Exception as e:
+            logger.error(f"Error loading model: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
 
     def load_local_model(self, context):
         """
@@ -107,27 +126,55 @@ class ChatbotService(BaseGenerativeService):
         Args:
             context: MLflow model context containing artifacts
         """
-        logger.info("Initializing local LlamaCpp model.")
-        model_path = self.model_config.get("local_model_path", context.artifacts.get("models", ""))
-
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"The model file was not found at: {model_path}")
-
-        self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-        self.llm = LlamaCpp(
-            model_path=model_path,
-            n_gpu_layers=30,
-            n_batch=512,
-            n_ctx=4096,
-            max_tokens=1024,
-            f16_kv=True,
-            callback_manager=self.callback_manager,
-            verbose=False,
-            stop=[],
-            streaming=False,
-            temperature=0.2,
-        )
-        logger.info("Using the local LlamaCpp model.")
+        try:
+            logger.info("Initializing local LlamaCpp model.")
+            model_path = self.model_config.get("local_model_path", context.artifacts.get("models", ""))
+            
+            logger.info(f"Model path: {model_path}")
+            
+            if not os.path.exists(model_path):
+                logger.error(f"Model file not found at: {model_path}")
+                raise FileNotFoundError(f"The model file was not found at: {model_path}")
+            
+            logger.info(f"Model file exists. Size: {os.path.getsize(model_path) / (1024 * 1024):.2f} MB")
+            
+            logger.info("Setting up callback manager")
+            self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+            
+            logger.info("Initializing LlamaCpp with the following parameters:")
+            logger.info(f"  - Model Path: {model_path}")
+            logger.info(f"  - n_gpu_layers: 30, n_batch: 512, n_ctx: 4096")
+            logger.info(f"  - max_tokens: 1024, f16_kv: True, temperature: 0.2")
+            
+            try:
+                self.llm = LlamaCpp(
+                    model_path=model_path,
+                    n_gpu_layers=30,
+                    n_batch=512,
+                    n_ctx=4096,
+                    max_tokens=1024,
+                    f16_kv=True,
+                    callback_manager=self.callback_manager,
+                    verbose=True, 
+                    stop=[],
+                    streaming=False,
+                    temperature=0.2,
+                )
+                logger.info("LlamaCpp model initialized successfully.")
+            except Exception as model_error:
+                logger.error(f"Failed to initialize LlamaCpp model: {str(model_error)}")
+                logger.error(f"Exception type: {type(model_error).__name__}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
+                
+            logger.info("Using the local LlamaCpp model.")
+        except Exception as e:
+            logger.error(f"Error in load_local_model: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
 
     def load_local_hf_model(self, context):
         """
