@@ -276,6 +276,7 @@ Question: {query}
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
+            code_paths=["../core", "../../src"],
             pip_requirements=[
                 "mlflow==2.9.2", 
                 "langchain", 

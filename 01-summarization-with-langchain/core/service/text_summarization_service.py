@@ -270,6 +270,7 @@ class TextSummarizationService(BaseGenerativeService):
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
+            code_paths=["../core", "../../src"],
             pip_requirements=[
                 "galileo-protect==0.15.1",
                 "galileo-observe==1.13.2",
