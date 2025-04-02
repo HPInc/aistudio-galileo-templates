@@ -47,7 +47,21 @@ class CodeGenerationService(BaseGenerativeService):
         """
         try:
             logger.info(f"Loading vector store from {persist_directory}")
-            self.vector_store = Chroma(persist_directory=persist_directory)
+            
+            # Initialize embedding function
+            from langchain.embeddings import HuggingFaceEmbeddings
+            
+            logger.info("Initializing embedding model")
+            embedding_function = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-mpnet-base-v2"
+            )
+            logger.info("Embedding model loaded successfully.")
+            
+            # Try to load existing vector store with the embedding function
+            self.vector_store = Chroma(
+                persist_directory=persist_directory,
+                embedding_function=embedding_function
+            )
             self.retriever = self.vector_store.as_retriever()
             logger.info(f"Vector store successfully loaded from {persist_directory}")
         except Exception as e:
@@ -55,7 +69,11 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
             # Create an empty vector store if loading fails
-            self.vector_store = Chroma()
+            from langchain.embeddings import HuggingFaceEmbeddings
+            embedding_function = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-mpnet-base-v2"
+            )
+            self.vector_store = Chroma(embedding_function=embedding_function)
             self.retriever = self.vector_store.as_retriever()
             logger.info("Created new empty vector store")
     
