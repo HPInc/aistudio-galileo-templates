@@ -207,17 +207,25 @@ Question: {query}
         Returns:
             Dictionary with the generated code in a "result" field
         """
-        question = model_input.get("question", "")
+        # Handle question input whether it's a pandas Series or a string
+        if "question" in model_input:
+            # If it's a pandas Series, extract the first value
+            if hasattr(model_input["question"], "iloc"):
+                question = model_input["question"].iloc[0] if not model_input["question"].empty else ""
+            else:
+                question = model_input["question"]
+        else:
+            question = ""
         
         if not question:
             logger.warning("No question provided for code generation")
-            return {"result": "Error: No question provided for code generation."}
+            return pd.DataFrame([{"result": "Error: No question provided for code generation."}])
         
         try:
-            logger.info(f"Processing code generation request: {question[:50]}...")
+            logger.info(f"Processing code generation request: {str(question)[:50]}...")
             # Run the protected chain with monitoring
             result = self.protected_chain.invoke(
-                {"input": question, "output": ""},
+                {"question": question}, 
                 config={"callbacks": [self.prompt_handler]}
             )
             logger.info("Code generation processed successfully")
@@ -225,14 +233,14 @@ Question: {query}
             # Clean up the result (remove markdown code blocks if present)
             clean_code = result.replace("```python", "").replace("```", "").strip()
             
-            return {"result": clean_code}
+            return pd.DataFrame([{"result": clean_code}])
         except Exception as e:
             error_message = f"Error processing code generation: {str(e)}"
             logger.error(error_message)
             logger.error(f"Exception type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            return {"result": error_message}
+            return pd.DataFrame([{"result": error_message}])
     
     @classmethod
     def log_model(cls, secrets_path, config_path, model_path=None):
