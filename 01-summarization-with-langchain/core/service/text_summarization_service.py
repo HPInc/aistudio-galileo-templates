@@ -214,7 +214,7 @@ class TextSummarizationService(BaseGenerativeService):
             logger.info("Processing summarization request")
             # Run the input through the protection chain with monitoring
             result = self.protected_chain.invoke(
-                {"input": text, "output": ""},
+                {"context": text}, 
                 config={"callbacks": [self.monitor_handler]}
             )
             logger.info("Successfully processed summarization request")
