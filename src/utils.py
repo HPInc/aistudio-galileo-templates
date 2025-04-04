@@ -66,8 +66,8 @@ def configure_proxy(config: Dict[str, Any]) -> None:
     Args:
         config: Configuration dictionary that may contain a "proxy" key.
     """
-    if "GALILEO_PROXY" in config and config["GALILEO_PROXY"]:
-        os.environ["HTTPS_PROXY"] = config["GALILEO_PROXY"]
+    if "proxy" in config and config["proxy"]:
+        os.environ["HTTPS_PROXY"] = config["proxy"]
 
 
 def initialize_llm(
