@@ -521,11 +521,12 @@ class ChatbotService(BaseGenerativeService):
         return pd.DataFrame([result])
 
     @classmethod
-    def log_model(cls, secrets_path, config_path, docs_path, model_path=None, demo_folder=None):
+    def log_model(cls, artifact_path, secrets_path, config_path, docs_path, model_path=None, demo_folder=None):
         """
         Log the model to MLflow.
         
         Args:
+            artifact_path: Path to store the model artifacts
             secrets_path: Path to the secrets file
             config_path: Path to the configuration file
             docs_path: Path to the documents directory
@@ -579,7 +580,7 @@ class ChatbotService(BaseGenerativeService):
         
         # Log model to MLflow
         mlflow.pyfunc.log_model(
-            artifact_path="chatbot_service",
+            artifact_path=artifact_path,
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
