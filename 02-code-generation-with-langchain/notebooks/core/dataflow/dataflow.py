@@ -1,33 +1,34 @@
 import pandas as pd
-from langchain_huggingface import HuggingFaceEmbeddings
+from tqdm import tqdm
 
 class EmbeddingUpdater:
-    def __init__(self, model_name="all-MiniLM-L6-v2", verbose=False):
+    def __init__(self, embedding_model, verbose=False):
         """
-        Initialize the embedding generator using a HuggingFace embedding model.
+        Initialize with an external embedding model instance.
 
-        :param model_name: Name of the Hugging Face model to use for embeddings
-        :param verbose: If True, will print logs during embedding updates
+        :param embedding_model: Object with method embed_query(text)
+        :param verbose: If True, will print logs or show progress
         """
-        self.embeddings = HuggingFaceEmbeddings(model_name=model_name)
+        self.embedding_model = embedding_model
         self.verbose = verbose
 
     def update(self, data_structure):
         """
-        Update each item's 'embedding' field using the LLM embeddings for context.
+        Update each item's 'embedding' field using the given embedding model.
 
         :param data_structure: List of dictionaries with a 'context' field
-        :return: Updated structure with embeddings
+        :return: List with embeddings included
         """
         updated_structure = []
+        iterator = tqdm(data_structure, desc="Generating Embeddings") if self.verbose else data_structure
 
-        for item in data_structure:
-            context = item.get('context', "")
-            embedding_vector = self.embeddings.embed_query(context)
-            item['embedding'] = embedding_vector
+        for item in iterator:
+            context = item.get("context", "")
+            embedding_vector = self.embedding_model.embed_query(context)
+            item["embedding"] = embedding_vector
             updated_structure.append(item)
 
-            if self.verbose:
+            if self.verbose and not isinstance(iterator, tqdm):
                 print(f"[LOG] Embedding generated for ID {item.get('id', 'unknown')}")
 
         return updated_structure
@@ -52,12 +53,12 @@ class DataFrameConverter:
         outputs = []
         for snippet in embedded_snippets:
             row = {
-                "ids": snippet['id'],
-                "embeddings": snippet['embedding'],
-                "code": snippet['code'],
+                "ids": snippet.get("id"),
+                "embeddings": snippet.get("embedding"),
+                "code": snippet.get("code"),
                 "metadatas": {
-                    "filenames": snippet['filename'],
-                    "context": snippet['context'],
+                    "filenames": snippet.get("filename"),
+                    "context": snippet.get("context"),
                 },
             }
             outputs.append(row)
@@ -75,8 +76,6 @@ class DataFrameConverter:
 
         :param df: DataFrame with 'metadatas' column
         """
-        contexts = df['metadatas'].apply(lambda x: x.get('context', None))
+        contexts = df["metadatas"].apply(lambda x: x.get("context", None))
         print("[LOG] Contexts in DataFrame:")
         print(contexts)
-
-

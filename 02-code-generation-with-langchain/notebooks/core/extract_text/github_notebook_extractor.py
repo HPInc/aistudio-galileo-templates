@@ -1,82 +1,101 @@
-import pandas as pd
-from langchain_huggingface import HuggingFaceEmbeddings
-
-class EmbeddingUpdater:
-    def __init__(self, model_name="all-MiniLM-L6-v2", verbose=False):
-        """
-        Initialize the embedding generator using a HuggingFace embedding model.
-
-        :param model_name: Name of the Hugging Face model to use for embeddings
-        :param verbose: If True, will print logs during embedding updates
-        """
-        self.embeddings = HuggingFaceEmbeddings(model_name=model_name)
+import os
+import requests
+import shutil
+import nbformat
+import uuid
+import logging
+from typing import List, Dict
+ 
+class GitHubNotebookExtractor:
+    """
+    Extracts code and context from Jupyter notebooks in a GitHub repository.
+    Downloads `.ipynb` files and extracts markdown + code cells.
+ 
+    Attributes:
+        repo_owner (str): GitHub repository owner.
+        repo_name (str): GitHub repository name.
+        save_dir (str): Local directory to save downloaded notebooks.
+        verbose (bool): If True, enables logging output (INFO+ only).
+    """
+ 
+    def __init__(self, repo_owner: str, repo_name: str, save_dir: str = './notebooks', verbose: bool = False):
+        self.repo_owner = repo_owner
+        self.repo_name = repo_name
+        self.save_dir = save_dir
         self.verbose = verbose
-
-    def update(self, data_structure):
-        """
-        Update each item's 'embedding' field using the LLM embeddings for context.
-
-        :param data_structure: List of dictionaries with a 'context' field
-        :return: Updated structure with embeddings
-        """
-        updated_structure = []
-
-        for item in data_structure:
-            context = item.get('context', "")
-            embedding_vector = self.embeddings.embed_query(context)
-            item['embedding'] = embedding_vector
-            updated_structure.append(item)
-
-            if self.verbose:
-                print(f"[LOG] Embedding generated for ID {item.get('id', 'unknown')}")
-
-        return updated_structure
-
-
-class DataFrameConverter:
-    def __init__(self, verbose=False):
-        """
-        Initialize the DataFrame converter.
-
-        :param verbose: If True, will print logs during DataFrame conversion
-        """
-        self.verbose = verbose
-
-    def to_dataframe(self, embedded_snippets):
-        """
-        Convert embedded snippets into a DataFrame format.
-
-        :param embedded_snippets: List of dicts with embedding and metadata
-        :return: Pandas DataFrame
-        """
-        outputs = []
-        for snippet in embedded_snippets:
-            row = {
-                "ids": snippet['id'],
-                "embeddings": snippet['embedding'],
-                "code": snippet['code'],
-                "metadatas": {
-                    "filenames": snippet['filename'],
-                    "context": snippet['context'],
-                },
-            }
-            outputs.append(row)
-
-        df = pd.DataFrame(outputs)
-
-        if self.verbose:
-            print("[LOG] DataFrame created with", len(df), "rows")
-
-        return df
-
-    def print_contexts(self, df):
-        """
-        Display the 'context' field from the 'metadatas' column.
-
-        :param df: DataFrame with 'metadatas' column
-        """
-        contexts = df['metadatas'].apply(lambda x: x.get('context', None))
-        print("[LOG] Contexts in DataFrame:")
-        print(contexts)
-
-
+        self.api_base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents"
+ 
+        # Setup logger
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.propagate = False  
+        self.logger.handlers.clear()
+ 
+        if verbose:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('[%(levelname)s] %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
+        else:
+            self.logger.addHandler(logging.NullHandler())
+ 
+    def run(self) -> List[Dict]:
+        if os.path.exists(self.save_dir):
+            shutil.rmtree(self.save_dir)
+            self.logger.info(f"Removed existing directory: {self.save_dir}")
+ 
+        os.makedirs(self.save_dir, exist_ok=True)
+        self.logger.info(f"Created directory: {self.save_dir}")
+ 
+        return self._process_directory(self.api_base_url)
+ 
+    def _process_directory(self, api_url: str) -> List[Dict]:
+        response = requests.get(api_url)
+        if response.status_code != 200:
+            self.logger.error(f"Failed to fetch contents from {api_url} (status: {response.status_code})")
+            return []
+ 
+        contents = response.json()
+        all_data = []
+ 
+        for item in contents:
+            if item['type'] == 'file' and item['name'].endswith('.ipynb'):
+                notebook_path = os.path.join(self.save_dir, item['name'])
+                self._download_file(item['download_url'], notebook_path)
+                all_data.extend(self._extract_from_notebook(notebook_path))
+            elif item['type'] == 'dir':
+                subdir_url = f"{self.api_base_url}/{item['path']}"
+                all_data.extend(self._process_directory(subdir_url))
+ 
+        return all_data
+ 
+    def _download_file(self, file_url: str, save_path: str) -> None:
+        response = requests.get(file_url)
+        if response.status_code == 200:
+            with open(save_path, 'wb') as f:
+                f.write(response.content)
+            self.logger.info(f"Downloaded: {save_path}")
+        else:
+            self.logger.warning(f"Failed to download {file_url} (status: {response.status_code})")
+ 
+    def _extract_from_notebook(self, notebook_path: str) -> List[Dict]:
+        with open(notebook_path, 'r', encoding='utf-8') as f:
+            notebook = nbformat.read(f, as_version=4)
+ 
+        extracted_data = []
+        context = ''
+ 
+        for cell in notebook['cells']:
+            if cell['cell_type'] == 'markdown':
+                context = ''.join(cell['source'])
+            elif cell['cell_type'] == 'code':
+                cell_data = {
+                    "id": str(uuid.uuid4()),
+                    "embedding": None,
+                    "code": ''.join(cell['source']),
+                    "filename": os.path.basename(notebook_path),
+                    "context": context
+                }
+                extracted_data.append(cell_data)
+ 
+        return extracted_data
