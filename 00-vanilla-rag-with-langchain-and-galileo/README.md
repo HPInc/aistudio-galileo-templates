@@ -61,10 +61,13 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 
 ### Step 4: Add the Model to Workspace
 
-- Download the **LLaMA2-7B** model from AWS S3:
+- Download the **LLaMA2-7B** model from AWS S3 using the Models tab in your AI Studio project:
+  - **Dataset Name**: `llama2-7b`
+  - **Dataset Source**: `AWS S3`
   - **S3 URI**: `s3://149536453923-hpaistudio-public-assets/llama2-7b`
-  - **Region**: `us-west-2`
+  - **Bucket Region**: `us-west-2`
 - Make sure that the model is in the `datafabric` folder inside your workspace.
+  
 ### Step 5: Configure Secrets and Paths
 
 - Add your API keys to the `secrets.yaml` file under the `configs` folder:
