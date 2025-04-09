@@ -12,7 +12,7 @@
 
 ## 🧠 Overview
 
-This project demonstrates how to build a semantic chunking and summarization pipeline for transcripts using **LangChain**, **Sentence Transformers** for semantic chunking, and **LLMs** for generating summaries. It integrates with **Galileo** for evaluation, protection, and monitoring of the generated summaries.
+This project demonstrates how to build a semantic chunking and summarization pipeline for transcripts using **LangChain**, **Sentence Transformers**, and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate concise and contextually accurate summaries from transcript data.
 
 ---
 
@@ -28,7 +28,7 @@ This project demonstrates how to build a semantic chunking and summarization pip
 │   ├── I_have_a_dream.txt
 │   └── I_have_a_dream.vtt
 ├── notebooks
-│   └── summarization-with-langchain.ipynb
+│   └── transcript-summarization-with-langchain-and-galileo.ipynb
 ├── configs
 │   ├── config.yaml
 │   └── secrets.yaml
@@ -81,24 +81,23 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 Execute the notebook inside the `notebooks` folder:
 
 ```bash
-notebooks/summarization-with-langchain.ipynb
+notebooks/transcript-summarization-with-langchain-and-galileo.ipynb
 ```
 
 This will:
-
-- Set up the semantic chunking pipeline using Sentence Transformers
-- Create a summarization chain using LangChain and LLMs
-- Integrate Galileo for evaluation, protection, and observation
-- Register the text summarization model in MLflow
+- Set up the semantic chunking pipeline
+- Create the summarization chain with LangChain
+- Integrate Galileo evaluation, protection, and observability
+- Register the model in MLflow
 
 ### Step 2: Deploy the Summarization Service
 
 - Go to **Deployments > New Service** in AI Studio.
 - Name the service and select the registered model.
-- Choose a model version and enable **GPU acceleration** if needed.
+- Choose a model version and enable **GPU acceleration**.
 - Start the deployment.
 - Once deployed, access the **Swagger UI** via the Service URL.
-- Use the API endpoints to submit texts for summarization.
+- Use the API endpoints to generate summaries from your transcript data.
 
 ---
 
@@ -109,4 +108,4 @@ This will:
 
 ---
 
-> Built with ❤️ using LangChain, Galileo, and Z by HP AI Studio.
+> Built with ❤️ using Z by HP AI Studio.
