@@ -29,9 +29,6 @@ This project demonstrates how to build a semantic chunking and summarization pip
 │   └── I_have_a_dream.vtt
 ├── notebooks
 │   └── transcript-summarization-with-langchain-and-galileo.ipynb
-├── configs
-│   ├── config.yaml
-│   └── secrets.yaml
 └── requirements.txt
 ```
 
