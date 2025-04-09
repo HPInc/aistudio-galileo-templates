@@ -64,9 +64,21 @@ This notebook performs automatic code explanation by extracting code snippets fr
 1. Choose **Local GenAI** as the base image when creating the workspace.
 
 ### Step 3: Log Model
-1. In the Datasets tab, click Add Dataset.
-2. Upload the model file: `ggml-model-f16-Q5_K_M.gguf.`
-3. The model will be available under the /datafabric directory in your workspace.
+
+1. Download the **LLaMA2-7B** model from AWS S3 using the Models tab in your AI Studio project:
+  - **Dataset Name**: `llama2-7b`
+  - **Dataset Source**: `AWS S3`
+  - **S3 URI**: `s3://149536453923-hpaistudio-public-assets/llama2-7b`
+  - **Bucket Region**: `us-west-2`
+- Make sure that the model is in the `datafabric` folder inside your workspace.
+
+2. The model will be available under the /datafabric directory in your workspace.
+
+### Step 4:  Configure Secrets and Paths
+1. Add your API keys to the `secrets.yaml` file under the `configs` folder:
+  - `HUGGINGFACE_API_KEY`
+  - `GALILEO_API_KEY`
+- Edit `config.yaml` with relevant configuration details.
 
 ---
 
@@ -97,3 +109,5 @@ This will:
 ## Contact and Support  
 - If you encounter issues, report them via GitHub by opening a new issue.  
 - Refer to the **[AI Studio Documentation](https://zdocs.datascience.hp.com/docs/aistudio/overview)** for detailed guidance and troubleshooting. 
+
+> Built with ❤️ using LangChain, Galileo, and Z by HP AI Studio.
