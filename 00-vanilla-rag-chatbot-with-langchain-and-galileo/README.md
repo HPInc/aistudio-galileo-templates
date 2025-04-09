@@ -2,11 +2,11 @@
 
 ## 📚 Contents
 
-- [Overview](#overview)
-- [Project Structure](#project-structure)
-- [Setup](#setup)
-- [Usage](#usage)
-- [Contact & Support](#contact--support)
+- Overview
+- Project Structure
+- Setup
+- Usage
+- Contact & Support
 
 ---
 
@@ -31,7 +31,7 @@ This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieva
 │   ├── index.html
 │   └── source
 ├── notebooks
-│   └── chatbot-with-langchain.ipynb
+│   └── vanilla-rag-chatbot-with-langchain-and-galileo.ipynb
 ├── configs
 │   ├── config.yaml
 │   └── secrets.yaml
