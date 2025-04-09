@@ -110,4 +110,4 @@ This will:
 - If you encounter issues, report them via GitHub by opening a new issue.  
 - Refer to the **[AI Studio Documentation](https://zdocs.datascience.hp.com/docs/aistudio/overview)** for detailed guidance and troubleshooting. 
 
-> Built with ❤️ using LangChain, Galileo, and Z by HP AI Studio.
+> Built with ❤️ using Z by HP AI Studio.
