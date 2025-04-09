@@ -2,4 +2,3 @@
 model_source: "local"
 galileo_url: "https://console.hp.galileocloud.io/"
 #proxy is used to setup HTTPS_PROXY environment variable when necessary 
-#proxy:
