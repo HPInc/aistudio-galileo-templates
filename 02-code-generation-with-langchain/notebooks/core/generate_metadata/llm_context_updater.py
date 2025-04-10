@@ -22,7 +22,7 @@ class LLMContextUpdater:
         formatter = logging.Formatter('[%(levelname)s] %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
-        self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
+        self.logger.setLevel(logging.DEBUG if verbose else logging.WARNING)  
 
     def update(self, data_structure):
         updated_structure = []
@@ -52,7 +52,7 @@ class LLMContextUpdater:
                 response = self.llm_chain.invoke(inputs)
                 item['context'] = response.strip()
 
-                self.logger.info(f"[LOG] Context updated for: {filename}")
+                self.logger.debug(f"[LOG] Context updated for: {filename}")  
 
             except httpcore.ConnectError as e:
                 self.logger.error(f"Connection error on {filename}: {str(e)}")
