@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@veneer/core';
 import { IconInfo } from '@veneer/core';
 import { Toggle } from '@veneer/core';
 import { Button } from '@veneer/core';
 import { TextArea } from '@veneer/core';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 import './App.css';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).href;
 
 function App() {
 	// State for file upload and processing
@@ -80,20 +87,33 @@ function App() {
 	 * @returns {Promise<string>} - The extracted text
 	 */
 	async function extractTextFromFile(file) {
-		// Simple text extraction based on file type
-		if (file.type === "text/plain") {
-			return await file.text();
-		} else if (file.type === "application/pdf") {
-			// For PDF files, we would normally use a PDF parsing library
-			// Since we can't install libraries in this environment, we'll show a placeholder
-			return await file.text(); // This won't correctly parse PDF content
-		} else if (file.type === "application/msword" || 
-				  file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-			// For DOC/DOCX files, we would use a specific library
-			// Placeholder for now
-			return await file.text(); // This won't correctly parse DOC/DOCX content
-		} else {
-			throw new Error("Unsupported file format");
+		try {
+			// Simple text extraction based on file type
+			if (file.type === "text/plain") {
+				return await file.text();
+			} else if (file.type === "application/pdf") {
+				const arrayBuffer = await file.arrayBuffer();
+				const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+				let extractedText = '';
+				for (let i = 1; i <= pdf.numPages; i++) {
+					const page = await pdf.getPage(i);
+					const textContent = await page.getTextContent();
+					const pageText = textContent.items.map(item => item.str).join(' ');
+					extractedText += `Page ${i}:\n${pageText}\n\n`;
+				}
+				return extractedText || "PDF text extraction complete. No text found or PDF contains images.";
+			} else if (file.type === "application/msword" || 
+					file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+				const arrayBuffer = await file.arrayBuffer();
+				const result = await mammoth.extractRawText({ arrayBuffer });
+				return result.value || "No text could be extracted from the document.";
+			} else {
+				throw new Error("Unsupported file format");
+			}
+		} catch (error) {
+			console.error("Error extracting text:", error);
+			throw new Error(`Failed to extract text: ${error.message}`);
 		}
 	}
 	
