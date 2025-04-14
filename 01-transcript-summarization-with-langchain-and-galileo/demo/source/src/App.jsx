@@ -177,7 +177,7 @@ function App() {
 						<h3 className='title'>Text Summarization with AI Studio</h3>
 					</div>
 					<div className="header-description">
-						<p>Extract and summarize key information from text documents</p>
+						<p>Extract and summarize information from text documents</p>
 					</div>
 				</div>
 			</div>
