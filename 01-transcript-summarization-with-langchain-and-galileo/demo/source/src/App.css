@@ -1,0 +1,186 @@
+#root {
+  margin-right:0px;
+  width:1200px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.my_card {
+  padding: 50px;
+}
+
+.card {
+  padding: 2em;
+}
+
+.main-detail-box {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 20px;
+}
+
+.text-module-card {
+  margin-left: 15px;
+  margin-right: 15px;
+}
+
+.original-text-area .vn-textarea {
+  height: 500px;
+}
+
+.summary-text-area .vn-textarea {
+  height: 500px;
+}
+
+.output-external-area .vn-textarea {
+  height: 300px;
+}
+
+/* Division */
+#root > div {
+  margin-right: 0px;
+  width: 1200px;
+}
+
+.input-text-area-container {
+  color: #fff !important;
+}
+
+.file-upload-card {
+  margin-bottom: 20px;
+}
+
+.text-info {
+  height: 100%;
+}
+
+.summary-info {
+  height: 100%;
+}
+
+.output-container {
+  padding: 20px;
+}
+
+.output-text-area {
+  margin-top: 20px;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+}
+
+.input-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.input-toggle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.header-logo {
+  display: flex;
+  justify-content: center;
+}
+
+.title-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 20px;
+  text-align: left;
+}
+
+.title {
+  font-size: 30px;
+  line-height: normal;
+}
+
+.title-with-icon {
+  display: flex;
+  flex-direction: row; 
+}
+
+.title-with-icon-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 10px;
+}
+
+.outer-padding {
+  padding: 20px;
+}
+
+.card-expanded {
+  width: 75%;
+}
+
+.card-not-expanded {
+  width: 33%;
+}
+
+.file-input-container {
+  margin: 20px 0;
+}
+
+.file-input {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.file-info {
+  font-style: italic;
+  margin-bottom: 15px;
+}
+
+.error-message {
+  color: #e74c3c;
+  margin: 10px 0;
+  font-weight: bold;
+}
+
+.black-box {
+  margin: 20px 0;
+}
+
+/* Responsive styles */
+@media (max-width: 1200px) {
+  #root {
+    width: 100%;
+    padding: 1rem;
+  }
+  
+  .main-detail-box {
+    flex-direction: column;
+  }
+  
+  .text-module-card {
+    width: 100% !important;
+    margin: 10px 0;
+  }
+}
