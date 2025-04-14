@@ -131,7 +131,6 @@ function App() {
 		setError(null);
 		
 		try {
-			// Changed from 'question' to 'text' key to match our use case
 			const requestBody = {
 				inputs: {
 					text: [fileText]
