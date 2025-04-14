@@ -4,6 +4,7 @@ import { IconInfo } from '@veneer/core';
 import { Toggle } from '@veneer/core';
 import { Button } from '@veneer/core';
 import { TextArea } from '@veneer/core';
+import { FilePicker } from '@veneer/core';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import './App.css';
@@ -190,16 +191,20 @@ function App() {
 						<h4>Upload Document</h4>
 						<p>Select a text file, PDF, or Word document to summarize.</p>
 						<div className="file-input-container">
-							<input 
-								type="file" 
-								accept=".txt,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" 
+							<FilePicker
+								id="file-picker"
+								accept=".txt,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+								error={!!error}
+								helperText={error}
 								onChange={handleFileChange}
 								className="file-input"
+								onClear={() => {
+									setFile(null);
+									setFileText("");
+									setError(null);
+								}}
 							/>
 						</div>
-						{fileName && <p className="file-info">Selected file: {fileName}</p>}
-						{error && <p className="error-message">{error}</p>}
-						
 						<div className="input-control input-buttons">
 							<div className='input-toggle'>
 								<Toggle className="detail-toggle" label="Show Details" onChange={setShowDetails} />

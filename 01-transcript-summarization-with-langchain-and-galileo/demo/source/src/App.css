@@ -24,8 +24,7 @@
 
 .main-detail-box {
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 20px;
 }
 
@@ -36,8 +35,10 @@
 }
 
 .text-module-card {
-  margin-left: 15px;
-  margin-right: 15px;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .original-text-area .vn-textarea {
@@ -133,24 +134,31 @@
   padding: 20px;
 }
 
-.card-expanded {
+.white-box .card-expanded,
+.white-box .card-not-expanded {
+  width: 100%;
+}
+
+/* Keep original classes for other components */
+.card-expanded:not(.white-box .card-expanded) {
   width: 75%;
 }
 
-.card-not-expanded {
+.card-not-expanded:not(.white-box .card-not-expanded) {
   width: 33%;
 }
 
 .file-input-container {
   margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .file-input {
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
   width: 100%;
-  max-width: 400px;
+  width: 600px;
 }
 
 .file-info {
