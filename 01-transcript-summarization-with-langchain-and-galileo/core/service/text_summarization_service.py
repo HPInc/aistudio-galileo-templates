@@ -230,14 +230,16 @@ class TextSummarizationService(BaseGenerativeService):
         return pd.DataFrame([{"summary": result}])
         
     @classmethod
-    def log_model(cls, secrets_path, config_path, model_path=None):
+    def log_model(cls, artifact_path, secrets_path, config_path, model_path=None, demo_folder=None):
         """
         Log the model to MLflow.
         
         Args:
+            artifact_path: Path to store the model artifacts
             secrets_path: Path to the secrets file
             config_path: Path to the configuration file
             model_path: Path to the model file (optional)
+            demo_folder: Path to the demo folder (optional)
             
         Returns:
             None
@@ -246,6 +248,10 @@ class TextSummarizationService(BaseGenerativeService):
         from mlflow.models.signature import ModelSignature
         from mlflow.types.schema import Schema, ColSpec
         
+        # Create demo folder if specified and doesn't exist
+        if demo_folder and not os.path.exists(demo_folder):
+            os.makedirs(demo_folder, exist_ok=True)
+            
         # Define model input/output schema
         input_schema = Schema([
             ColSpec("string", "text")
@@ -261,12 +267,15 @@ class TextSummarizationService(BaseGenerativeService):
             "config": config_path
         }
         
+        if demo_folder:
+            artifacts["demo"] = demo_folder
+            
         if model_path:
             artifacts["model"] = model_path
         
         # Log model to MLflow
         mlflow.pyfunc.log_model(
-            artifact_path="text_summarization_service",
+            artifact_path=artifact_path,
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,
