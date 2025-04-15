@@ -153,8 +153,25 @@ function App() {
 			const jsonResponse = await response.json();
 			console.log("JSON Response:", jsonResponse);
 			
-			const predictions = jsonResponse.predictions;
-			setSummaryResponse(predictions.summary || "No summary provided by the model.");
+			if (jsonResponse.predictions) {
+				if (Array.isArray(jsonResponse.predictions) && jsonResponse.predictions.length > 0) {
+					const firstPrediction = jsonResponse.predictions[0];
+					if (firstPrediction.summary) {
+						setSummaryResponse(firstPrediction.summary);
+					} else {
+						setSummaryResponse("No summary data found in model response.");
+					}
+				} 
+				// Handle direct object case
+				else if (jsonResponse.predictions.summary) {
+					setSummaryResponse(jsonResponse.predictions.summary);
+				}
+				else {
+					setSummaryResponse("No summary provided by the model.");
+				}
+			} else {
+				setSummaryResponse("Invalid response format from model.");
+			}
 		} catch (error) {
 			console.error("Error when calling the API:", error);
 			setError(`Failed to get summary: ${error.message}`);
