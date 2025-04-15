@@ -218,16 +218,30 @@ class TextSummarizationService(BaseGenerativeService):
                 config={"callbacks": [self.monitor_handler]}
             )
             logger.info("Successfully processed summarization request")
+            
+            if isinstance(result, dict) and "predictions" in result and len(result["predictions"]) > 0:
+                if "summary" in result["predictions"][0]:
+                    summary = result["predictions"][0]["summary"]
+                    logger.info("Extracted summary from predictions array")
+                else:
+                    logger.warning("Found predictions array but no summary field")
+                    summary = str(result)
+            else:
+                # Use the result directly if it's a string or other format
+                summary = result
+                
+            logger.info(f"Summary extraction completed, type: {type(summary)}")
+            
         except Exception as e:
             error_message = f"Error processing summarization request: {str(e)}"
             logger.error(error_message)
             logger.error(f"Exception type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            result = error_message
+            summary = error_message
         
         # Return the result as a DataFrame with a summary column
-        return pd.DataFrame([{"summary": result}])
+        return pd.DataFrame([{"summary": summary}])
         
     @classmethod
     def log_model(cls, artifact_path, secrets_path, config_path, model_path=None, demo_folder=None):
