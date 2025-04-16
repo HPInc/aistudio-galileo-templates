@@ -31,7 +31,7 @@ This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieva
 │   ├── index.html
 │   └── source
 ├── notebooks
-│   └── vanilla-rag-chatbot-with-langchain-and-galileo.ipynb
+│   └── vanilla-rag-with-langchain-and-galileo.ipynb
 ├── configs
 │   ├── config.yaml
 │   └── secrets.yaml
@@ -84,7 +84,7 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 Execute the notebook inside the `notebooks` folder:
 
 ```bash
-notebooks/chatbot-with-langchain.ipynb
+notebooks/vanilla-rag-with-langchain-and-galileo.ipynb
 ```
 
 This will:
@@ -111,5 +111,5 @@ This will:
 
 ---
 
-> Built with ❤️ using LangChain, Galileo, and Z by HP AI Studio.
+> Built with ❤️ using Z by HP AI Studio.
 
