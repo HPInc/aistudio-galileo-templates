@@ -42,10 +42,16 @@ This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieva
 
 ## ⚙️ Setup
 
+### Step 0: Minimum Hardware Requirements
+To ensure smooth execution and reliable model deployment, make sure your system meets the following minimum hardware specifications:
+
+- RAM: 16 GB or more
+- VRAM: 12 GB or more
+- GPU: NVIDIA GPU recommended
+
 ### Step 1: Create an AI Studio Project
 
 - Create a new project in [Z by HP AI Studio](https://zdocs.datascience.hp.com/docs/aistudio/overview).
-- (Optional) Add a description and relevant tags.
 
 ### Step 2: Set Up a Workspace
 
