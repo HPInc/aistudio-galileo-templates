@@ -137,7 +137,7 @@ function App() {
 				},
 				params: {}
 			};
-			
+			console.log("Request body:", requestBody);	
 			const response = await fetch("/invocations", {
 				method: "POST",
 				headers: {
@@ -155,11 +155,8 @@ function App() {
 			if (jsonResponse.predictions) {
 				if (Array.isArray(jsonResponse.predictions) && jsonResponse.predictions.length > 0) {
 					const firstPrediction = jsonResponse.predictions[0];
-					console.log("First prediction:", firstPrediction);
-					console.log("Has summary property:", Object.hasOwn(firstPrediction, "summary"));
 					
 					if (firstPrediction.summary) {
-						console.log("Summary value:", firstPrediction.summary);
 						setSummaryResponse(firstPrediction.summary);
 					} else {
 						setSummaryResponse("No summary data found in model response.");
