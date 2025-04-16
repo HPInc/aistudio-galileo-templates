@@ -151,9 +151,6 @@ function App() {
 			}
 
 			const jsonResponse = await response.json();
-			console.log("JSON Response:", jsonResponse);
-			console.log("Type of predictions:", typeof jsonResponse.predictions);
-			console.log("Is Array:", Array.isArray(jsonResponse.predictions));
 
 			if (jsonResponse.predictions) {
 				if (Array.isArray(jsonResponse.predictions) && jsonResponse.predictions.length > 0) {
