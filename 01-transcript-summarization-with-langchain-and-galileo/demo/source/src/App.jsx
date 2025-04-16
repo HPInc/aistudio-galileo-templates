@@ -7,6 +7,7 @@ import { TextArea } from '@veneer/core';
 import { FilePicker } from '@veneer/core';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
+import iconImage from '../icon.ico';
 import './App.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -186,7 +187,7 @@ function App() {
 		<div>
 			<div className="header">
 				<div className="header-logo">
-					<img src="icon.ico" width="100px" height="100px" alt="Transcript Summarization Logo" /> 
+					<img src={iconImage} width="100px" height="100px" alt="Transcript Summarization Logo" /> 
 				</div>
 				<div className='title-info'>
 					<div className="header-title">
