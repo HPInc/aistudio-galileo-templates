@@ -218,26 +218,42 @@ class TextSummarizationService(BaseGenerativeService):
                 config={"callbacks": [self.monitor_handler]}
             )
             logger.info("Successfully processed summarization request")
+            
+            if isinstance(result, dict) and "predictions" in result and len(result["predictions"]) > 0:
+                if "summary" in result["predictions"][0]:
+                    summary = result["predictions"][0]["summary"]
+                    logger.info("Extracted summary from predictions array")
+                else:
+                    logger.warning("Found predictions array but no summary field")
+                    summary = str(result)
+            else:
+                # Use the result directly if it's a string or other format
+                summary = result
+                
+            logger.info(f"Summary extraction completed, type: {type(summary)}")
+            
         except Exception as e:
             error_message = f"Error processing summarization request: {str(e)}"
             logger.error(error_message)
             logger.error(f"Exception type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            result = error_message
+            summary = error_message
         
         # Return the result as a DataFrame with a summary column
-        return pd.DataFrame([{"summary": result}])
+        return pd.DataFrame([{"summary": summary}])
         
     @classmethod
-    def log_model(cls, secrets_path, config_path, model_path=None):
+    def log_model(cls, artifact_path, secrets_path, config_path, model_path=None, demo_folder=None):
         """
         Log the model to MLflow.
         
         Args:
+            artifact_path: Path to store the model artifacts
             secrets_path: Path to the secrets file
             config_path: Path to the configuration file
             model_path: Path to the model file (optional)
+            demo_folder: Path to the demo folder (optional)
             
         Returns:
             None
@@ -246,6 +262,10 @@ class TextSummarizationService(BaseGenerativeService):
         from mlflow.models.signature import ModelSignature
         from mlflow.types.schema import Schema, ColSpec
         
+        # Create demo folder if specified and doesn't exist
+        if demo_folder and not os.path.exists(demo_folder):
+            os.makedirs(demo_folder, exist_ok=True)
+            
         # Define model input/output schema
         input_schema = Schema([
             ColSpec("string", "text")
@@ -261,12 +281,15 @@ class TextSummarizationService(BaseGenerativeService):
             "config": config_path
         }
         
+        if demo_folder:
+            artifacts["demo"] = demo_folder
+            
         if model_path:
             artifacts["model"] = model_path
         
         # Log model to MLflow
         mlflow.pyfunc.log_model(
-            artifact_path="text_summarization_service",
+            artifact_path=artifact_path,
             python_model=cls(),
             artifacts=artifacts,
             signature=signature,

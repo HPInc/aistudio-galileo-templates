@@ -96,6 +96,10 @@ This will:
 - Once deployed, access the **Swagger UI** via the Service URL.
 - Use the API endpoints to generate summaries from your transcript data.
 
+### Successful Demonstration of the User Interface  
+
+![Transcript Summarization Demo UI](docs/ui_summarization.png)
+
 ---
 
 ## 📞 Contact & Support
