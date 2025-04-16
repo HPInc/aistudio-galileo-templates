@@ -73,6 +73,11 @@ The API returns a JSON response with the following structure:
 }
 ```
 
+
+### Successful Demonstration of the User Interface  
+
+![Transcript Summarization Demo UI](docs/ui_summarization.png) 
+
 ### Implementation Details
 
 - The application extracts text from uploaded documents (PDF, DOC, TXT) using client-side libraries
