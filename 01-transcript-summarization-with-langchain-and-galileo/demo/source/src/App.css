@@ -88,6 +88,14 @@
   align-items: center;
 }
 
+.header-title h3.title {
+  font-size: 4em;
+}
+
+.header-description p {
+  font-size: 2.0em;
+}
+
 .input-buttons {
   margin-top: 20px;
   display: flex;

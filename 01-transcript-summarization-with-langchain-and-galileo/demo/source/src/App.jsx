@@ -187,7 +187,7 @@ function App() {
 		<div>
 			<div className="header">
 				<div className="header-logo">
-					<img src={iconImage} width="100px" height="100px" alt="Transcript Summarization Logo" /> 
+					<img src={iconImage} width="150px" height="150px" alt="Transcript Summarization Logo" /> 
 				</div>
 				<div className='title-info'>
 					<div className="header-title">
@@ -223,7 +223,7 @@ function App() {
 						</div>
 						<div className="input-control input-buttons">
 							<div className='input-toggle'>
-								<Toggle className="detail-toggle" label="Show Details" onChange={setShowDetails} />
+								<Toggle className="detail-toggle" label="Show Original Text" onChange={setShowDetails} />
 							</div>
 							<Button 
 								className="submit-button" 
