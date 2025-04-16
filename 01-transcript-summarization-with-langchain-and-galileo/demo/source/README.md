@@ -44,4 +44,39 @@ The UI provides two viewing modes:
 
 ## API Integration
 
-This UI sends requests to the same API endpoint used by the vanilla-rag example, but with a modified request structure using a `text` key instead of a `question` key in the payload.
+This UI sends requests to the API endpoint provided by MLFlow. The application uses a RESTful approach to communicate with the backend:
+
+### API Request Format
+
+The application sends POST requests to the `/invocations` endpoint with the following JSON structure:
+
+```json
+{
+  "inputs": {
+    "text": ["Your document text here"]
+  },
+  "params": {}
+}
+```
+
+### API Response Format
+
+The API returns a JSON response with the following structure:
+
+```json
+{
+  "predictions": [
+    {
+      "summary": "The generated summary text"
+    }
+  ]
+}
+```
+
+### Implementation Details
+
+- The application extracts text from uploaded documents (PDF, DOC, TXT) using client-side libraries
+- Text extraction is handled by pdfjs-dist for PDFs and mammoth for Word documents
+- The extracted text is then sent to the API for summarization
+- The application handles both array and object response formats from the API
+- Error handling is implemented for API connection issues and invalid responses
