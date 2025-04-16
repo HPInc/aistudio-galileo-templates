@@ -137,7 +137,6 @@ function App() {
 				},
 				params: {}
 			};
-			console.log("Request body:", requestBody);	
 			const response = await fetch("/invocations", {
 				method: "POST",
 				headers: {
