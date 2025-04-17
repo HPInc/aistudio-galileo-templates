@@ -1,4 +1,4 @@
-# Chatbot with LangChain, RAG, and Galileo
+# Vanilla RAG with LangChain and Galileo
 
 ## 📚 Contents
 
@@ -12,14 +12,13 @@
 
 ## 🧠 Overview
 
-This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieval-Augmented Generation)**, and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate contextual and document-grounded answers to user queries.
+This project is an AI-powered vanilla **RAG (Retrieval-Augmented Generation)** chatbot built using **LangChain** and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate contextual and document-grounded answers to user queries.
 
 ---
 
 ## 🗂 Project Structure
 
 ```
-├── README.md
 ├── core
 │   └── chatbot_service
 │       ├── __init__.py
@@ -30,11 +29,11 @@ This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieva
 │   ├── assets
 │   ├── index.html
 │   └── source
+├── docs
+│   └── ui_vanilla_rag.png
 ├── notebooks
-│   └── vanilla-rag-chatbot-with-langchain-and-galileo.ipynb
-├── configs
-│   ├── config.yaml
-│   └── secrets.yaml
+│   └── vanilla-rag-with-langchain-and-galileo.ipynb
+├── README.md
 └── requirements.txt
 ```
 
@@ -42,10 +41,16 @@ This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieva
 
 ## ⚙️ Setup
 
+### Step 0: Minimum Hardware Requirements
+To ensure smooth execution and reliable model deployment, make sure your system meets the following minimum hardware specifications:
+
+- RAM: 64 GB 
+- VRAM: 12 GB 
+- GPU: NVIDIA GPU 
+
 ### Step 1: Create an AI Studio Project
 
 - Create a new project in [Z by HP AI Studio](https://zdocs.datascience.hp.com/docs/aistudio/overview).
-- (Optional) Add a description and relevant tags.
 
 ### Step 2: Set Up a Workspace
 
@@ -62,17 +67,17 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 ### Step 4: Add the Model to Workspace
 
 - Download the **LLaMA2-7B** model from AWS S3 using the Models tab in your AI Studio project:
-  - **Dataset Name**: `llama2-7b`
-  - **Dataset Source**: `AWS S3`
+  - **Model Name**: `llama2-7b`
+  - **Model Source**: `AWS S3`
   - **S3 URI**: `s3://149536453923-hpaistudio-public-assets/llama2-7b`
   - **Bucket Region**: `us-west-2`
-- Make sure that the model is in the `datafabric` folder inside your workspace.
+- Make sure that the model is in the `datafabric` folder inside your workspace. If the model does not appear after downloading, please restart your workspace.
   
 ### Step 5: Configure Secrets and Paths
 
-- Add your API keys to the `secrets.yaml` file under the `configs` folder:
-  - `HUGGINGFACE_API_KEY`
-  - `GALILEO_API_KEY`
+- Add your API keys to the `secrets.yaml` file located in the `configs` folder:
+  - `HUGGINGFACE_API_KEY`: Required to use Hugging Face-hosted models instead of a local LLaMA model.
+  - `GALILEO_API_KEY`: Required to connect to Galileo for evaluation, protection, and observability features.
 - Edit `config.yaml` with relevant configuration details.
 
 ---
@@ -84,7 +89,7 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 Execute the notebook inside the `notebooks` folder:
 
 ```bash
-notebooks/chatbot-with-langchain.ipynb
+notebooks/vanilla-rag-with-langchain-and-galileo.ipynb
 ```
 
 This will:
@@ -100,7 +105,11 @@ This will:
 - Choose a model version and enable **GPU acceleration**.
 - Start the deployment.
 - Once deployed, access the **Swagger UI** via the Service URL.
-- From the Swagger page, click the demo link to interact with the locally deployed chatbot via UI.
+- From the Swagger page, click the demo link to interact with the locally deployed vanilla RAG chatbot via UI.
+
+### Successful Demonstration of the User Interface  
+
+![Vanilla RAG Demo UI](docs/ui_vanilla_rag.png)  
 
 ---
 
@@ -111,5 +120,5 @@ This will:
 
 ---
 
-> Built with ❤️ using LangChain, Galileo, and Z by HP AI Studio.
+> Built with ❤️ using Z by HP AI Studio.
 
