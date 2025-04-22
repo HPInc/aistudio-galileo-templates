@@ -90,6 +90,10 @@ def initialize_llm(
         ImportError: If required libraries are not installed.
         ValueError: If an unsupported model_source is provided.
     """
+    import time
+    print(f"DEBUG: Starting initialize_llm with model_source={model_source}")
+    start_time = time.time()
+    
     # Check dependencies
     missing_deps = []
     for module in ["langchain_huggingface", "langchain_core.callbacks", "langchain_community.llms"]:
@@ -99,45 +103,91 @@ def initialize_llm(
     if missing_deps:
         raise ImportError(f"Missing required dependencies: {', '.join(missing_deps)}")
     
+    print(f"DEBUG: Importing required libraries...")
     # Import required libraries
     from langchain_huggingface import HuggingFacePipeline, HuggingFaceEndpoint
     from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
     from langchain_community.llms import LlamaCpp
+    
+    print(f"DEBUG: Successfully imported required libraries. Time elapsed: {time.time() - start_time:.2f}s")
 
     # Initialize based on model source
     if model_source == "hugging-face-cloud":
+        print(f"DEBUG: Initializing hugging-face-cloud model")
         if not secrets or "HUGGINGFACE_API_KEY" not in secrets:
             raise ValueError("HuggingFace API key is required for cloud model access")
             
         huggingfacehub_api_token = secrets["HUGGINGFACE_API_KEY"]
         repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
-        return HuggingFaceEndpoint(
+        print(f"DEBUG: Creating HuggingFaceEndpoint with repo_id={repo_id}")
+        endpoint = HuggingFaceEndpoint(
             huggingfacehub_api_token=huggingfacehub_api_token,
             repo_id=repo_id,
         )
+        print(f"DEBUG: Successfully initialized hugging-face-cloud model. Time elapsed: {time.time() - start_time:.2f}s")
+        return endpoint
     elif model_source == "hugging-face-local":
+        print(f"DEBUG: Initializing hugging-face-local model")
         from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
         
         model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+        print(f"DEBUG: Loading tokenizer from {model_id}")
         tokenizer = AutoTokenizer.from_pretrained(model_id)
+        print(f"DEBUG: Loading model from {model_id}")
         model = AutoModelForCausalLM.from_pretrained(model_id)
+        print(f"DEBUG: Creating pipeline")
         pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=100, device=0)
-        return HuggingFacePipeline(pipeline=pipe)
+        print(f"DEBUG: Creating HuggingFacePipeline")
+        hf_pipeline = HuggingFacePipeline(pipeline=pipe)
+        print(f"DEBUG: Successfully initialized hugging-face-local model. Time elapsed: {time.time() - start_time:.2f}s")
+        return hf_pipeline
     elif model_source == "local":
+        print(f"DEBUG: Initializing local LlamaCpp model from {local_model_path}")
+        print(f"DEBUG: Creating callback manager")
         callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-        return LlamaCpp(
-            model_path=local_model_path,
-            n_gpu_layers=30,
-            n_batch=512,
-            n_ctx=4096,
-            max_tokens=1024,
-            f16_kv=True,
-            callback_manager=callback_manager,
-            verbose=False,
-            stop=[],
-            streaming=False,
-            temperature=0.2,
-        )
+        
+        # Check if the model file exists
+        if not os.path.exists(local_model_path):
+            print(f"DEBUG: WARNING - Model file not found at {local_model_path}")
+            
+        print(f"DEBUG: Creating LlamaCpp instance with these parameters:")
+        print(f"DEBUG:   - model_path: {local_model_path}")
+        print(f"DEBUG:   - n_gpu_layers: 30, n_batch: 512, n_ctx: 4096")
+        print(f"DEBUG:   - max_tokens: 1024, f16_kv: True")
+        print(f"DEBUG:   - temperature: 0.2")
+        
+        try:
+            llama = LlamaCpp(
+                model_path=local_model_path,
+                n_gpu_layers=30,
+                n_batch=512,
+                n_ctx=4096,
+                max_tokens=1024,
+                f16_kv=True,
+                callback_manager=callback_manager,
+                verbose=False,
+                stop=[],
+                streaming=False,
+                temperature=0.2,
+            )
+            print(f"DEBUG: Successfully initialized local LlamaCpp model. Time elapsed: {time.time() - start_time:.2f}s")
+            return llama
+        except Exception as e:
+            print(f"DEBUG: ERROR initializing LlamaCpp: {str(e)}")
+            # Try with fewer parameters that might be incompatible in the new version
+            print(f"DEBUG: Attempting to initialize with fewer parameters")
+            try:
+                llama = LlamaCpp(
+                    model_path=local_model_path,
+                    n_gpu_layers=30,
+                    n_ctx=4096,
+                    temperature=0.2,
+                )
+                print(f"DEBUG: Successfully initialized local LlamaCpp model with fewer parameters. Time elapsed: {time.time() - start_time:.2f}s")
+                return llama
+            except Exception as e:
+                print(f"DEBUG: ERROR on second attempt: {str(e)}")
+                raise
     else:
         raise ValueError(f"Unsupported model source: {model_source}")
 
