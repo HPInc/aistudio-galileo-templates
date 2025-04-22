@@ -1,4 +1,4 @@
-# Chatbot with LangChain, RAG, and Galileo
+# Text Summarization with LangChain and Galileo
 
 ## 📚 Contents
 
@@ -12,7 +12,7 @@
 
 ## 🧠 Overview
 
-This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieval-Augmented Generation)**, and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate contextual and document-grounded answers to user queries.
+This project demonstrates how to build a semantic chunking and summarization pipeline for transcripts using **LangChain**, **Sentence Transformers**, and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate concise and contextually accurate summaries from transcript data.
 
 ---
 
@@ -21,20 +21,14 @@ This project is an AI-powered chatbot built using **LangChain**, **RAG (Retrieva
 ```
 ├── README.md
 ├── core
-│   └── chatbot_service
+│   └── service
 │       ├── __init__.py
-│       └── chatbot_service.py
+│       └── text_summarization_service.py
 ├── data
-│   └── AIStudioDoc.pdf
-├── demo
-│   ├── assets
-│   ├── index.html
-│   └── source
+│   ├── I_have_a_dream.txt
+│   └── I_have_a_dream.vtt
 ├── notebooks
-│   └── vanilla-rag-chatbot-with-langchain-and-galileo.ipynb
-├── configs
-│   ├── config.yaml
-│   └── secrets.yaml
+│   └── transcript-summarization-with-langchain-and-galileo.ipynb
 └── requirements.txt
 ```
 
@@ -84,23 +78,27 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 Execute the notebook inside the `notebooks` folder:
 
 ```bash
-notebooks/chatbot-with-langchain.ipynb
+notebooks/transcript-summarization-with-langchain-and-galileo.ipynb
 ```
 
 This will:
-
-- Run the full RAG pipeline
+- Set up the semantic chunking pipeline
+- Create the summarization chain with LangChain
 - Integrate Galileo evaluation, protection, and observability
 - Register the model in MLflow
 
-### Step 2: Deploy the Chatbot Service
+### Step 2: Deploy the Summarization Service
 
 - Go to **Deployments > New Service** in AI Studio.
 - Name the service and select the registered model.
 - Choose a model version and enable **GPU acceleration**.
 - Start the deployment.
 - Once deployed, access the **Swagger UI** via the Service URL.
-- From the Swagger page, click the demo link to interact with the locally deployed chatbot via UI.
+- Use the API endpoints to generate summaries from your transcript data.
+
+### Successful Demonstration of the User Interface  
+
+![Transcript Summarization Demo UI](docs/ui_summarization.png)
 
 ---
 
@@ -111,5 +109,4 @@ This will:
 
 ---
 
-> Built with ❤️ using LangChain, Galileo, and Z by HP AI Studio.
-
+> Built with ❤️ using Z by HP AI Studio.
