@@ -222,6 +222,25 @@ def initialize_galileo_evaluator(project_name: str, scorers: Optional[List] = No
         project_name=project_name,
         scorers=scorers
     )
+    
+def login_huggingface(secrets: Dict[str, Any]) -> None:
+    """
+    Login to Hugging Face using token from secrets.
+
+    Args:
+        secrets: Dictionary containing the Hugging Face token.
+
+    Raises:
+        ValueError: If the token is missing.
+    """
+    from huggingface_hub import login
+
+    token = secrets.get("HUGGINGFACE_API_KEY")
+    if not token:
+        raise ValueError("❌ Hugging Face token not found in secrets.yaml.")
+    
+    login(token=token)
+    print("✅ Logged into Hugging Face successfully.")
 
 
 def initialize_galileo_observer(project_name: str):
