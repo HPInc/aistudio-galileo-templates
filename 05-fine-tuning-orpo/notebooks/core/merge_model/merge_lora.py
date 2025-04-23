@@ -1,36 +1,30 @@
+import os
 import gc
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 from trl import setup_chat_format
-from huggingface_hub import login
 
-def merge_lora_and_push(
+def merge_lora_and_save(
     base_model_id: str,
     finetuned_lora_path: str,
-    push_to: str,
+    base_local_dir: str = None,
     use_bfloat16: bool = False,
-    add_chat_template: bool = True,
-    hf_token: str = None
+    add_chat_template: bool = True
 ):
     """
-    Merge LoRA weights into base model and push to Hugging Face Hub.
+    Merge LoRA weights into base model and save locally.
 
     Args:
-        base_model_id (str): The Hugging Face model ID or local path to base model.
-        finetuned_lora_path (str): Local directory where LoRA weights were saved.
-        push_to (str): Target repo name on Hugging Face (e.g., "username/model-merged").
-        use_bfloat16 (bool): Whether to use bfloat16 instead of float16.
-        add_chat_template (bool): If True, applies setup_chat_format to ensure prompt compatibility.
-        hf_token (str): Optional Hugging Face token to login before pushing.
+        base_model_id (str): HF model ID or local path to base model.
+        finetuned_lora_path (str): Path to directory with LoRA adapter weights.
+        base_local_dir (str): Base path where merged model will be saved.
+        use_bfloat16 (bool): Use bfloat16 if supported, otherwise fallback to float16.
+        add_chat_template (bool): Apply chat template if not present in tokenizer.
     """
     print("🧹 Cleaning up memory...")
     gc.collect()
     torch.cuda.empty_cache()
-
-    if hf_token:
-        print("🔐 Logging into Hugging Face...")
-        login(token=hf_token)
 
     torch_dtype = torch.bfloat16 if use_bfloat16 else torch.float16
 
@@ -46,7 +40,6 @@ def merge_lora_and_push(
 
     vocab_size_tokenizer = len(tokenizer)
     vocab_size_model = model.get_input_embeddings().num_embeddings
-
     if vocab_size_tokenizer != vocab_size_model:
         print(f"⚠️ Resizing token embeddings: model ({vocab_size_model}) → tokenizer ({vocab_size_tokenizer})")
         model.resize_token_embeddings(vocab_size_tokenizer)
@@ -64,8 +57,16 @@ def merge_lora_and_push(
     print("🧠 Merging LoRA weights...")
     model = model.merge_and_unload()
 
-    print(f"🚀 Pushing model to Hugging Face Hub: {push_to}")
-    model.push_to_hub(push_to, use_temp_dir=False)
-    tokenizer.push_to_hub(push_to, use_temp_dir=False)
+    base_model_name = base_model_id.split("/")[-1]
+    merged_model_name = f"Orpo-{base_model_name}-FT"
+    save_path = os.path.join(
+        base_local_dir or os.path.join("..", "..", "..", "local", "models_llora"),
+        merged_model_name
+    )
+    os.makedirs(save_path, exist_ok=True)
 
-    print("✅ Finished! Model successfully merged and uploaded.")
+    print(f"💾 Saving merged model to: {save_path}")
+    model.save_pretrained(save_path)
+    tokenizer.save_pretrained(save_path)
+
+    print("✅ Finished! Model successfully merged and saved locally.")
