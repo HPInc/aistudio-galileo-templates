@@ -20,6 +20,18 @@ function App() {
 	const [numImages, setNumImages] = useState(1);
 	const [numInferenceSteps, setNumInferenceSteps] = useState(30);
 	
+	// State for input values and validation
+	const [widthInput, setWidthInput] = useState("512");
+	const [heightInput, setHeightInput] = useState("512");
+	const [numImagesInput, setNumImagesInput] = useState("1");
+	const [inferenceStepsInput, setInferenceStepsInput] = useState("30");
+	
+	// State for validation errors
+	const [widthError, setWidthError] = useState(null);
+	const [heightError, setHeightError] = useState(null);
+	const [numImagesError, setNumImagesError] = useState(null);
+	const [inferenceStepsError, setInferenceStepsError] = useState(null);
+	
 	// State for API response
 	const [generatedImages, setGeneratedImages] = useState([]);
 	const [loading, setLoading] = useState(false);
@@ -72,8 +84,17 @@ function App() {
      * @param {string} value - The new input value
      */
     function handleWidthChange(value) {
+        setWidthInput(value);
+        
         const parsedValue = parseInt(value, 10);
-        if (!isNaN(parsedValue) && parsedValue >= 128 && parsedValue <= 1024) {
+        if (isNaN(parsedValue) || value === "") {
+            setWidthError("Width must be a number");
+        } else if (parsedValue < 128) {
+            setWidthError("Width must be at least 128px");
+        } else if (parsedValue > 1024) {
+            setWidthError("Width must be at most 1024px");
+        } else {
+            setWidthError(null);
             setWidth(parsedValue);
         }
     }
@@ -83,8 +104,17 @@ function App() {
      * @param {string} value - The new input value
      */
     function handleHeightChange(value) {
+        setHeightInput(value);
+        
         const parsedValue = parseInt(value, 10);
-        if (!isNaN(parsedValue) && parsedValue >= 128 && parsedValue <= 1024) {
+        if (isNaN(parsedValue) || value === "") {
+            setHeightError("Height must be a number");
+        } else if (parsedValue < 128) {
+            setHeightError("Height must be at least 128px");
+        } else if (parsedValue > 1024) {
+            setHeightError("Height must be at most 1024px");
+        } else {
+            setHeightError(null);
             setHeight(parsedValue);
         }
     }
@@ -94,8 +124,17 @@ function App() {
      * @param {string} value - The new input value
      */
     function handleNumImagesChange(value) {
+        setNumImagesInput(value);
+        
         const parsedValue = parseInt(value, 10);
-        if (!isNaN(parsedValue) && parsedValue >= 1 && parsedValue <= 4) {
+        if (isNaN(parsedValue) || value === "") {
+            setNumImagesError("Number of images must be a number");
+        } else if (parsedValue < 1) {
+            setNumImagesError("At least 1 image required");
+        } else if (parsedValue > 4) {
+            setNumImagesError("Maximum 4 images allowed");
+        } else {
+            setNumImagesError(null);
             setNumImages(parsedValue);
         }
     }
@@ -105,10 +144,27 @@ function App() {
      * @param {string} value - The new input value
      */
     function handleInferenceStepsChange(value) {
+        setInferenceStepsInput(value);
+        
         const parsedValue = parseInt(value, 10);
-        if (!isNaN(parsedValue) && parsedValue >= 1 && parsedValue <= 100) {
+        if (isNaN(parsedValue) || value === "") {
+            setInferenceStepsError("Inference steps must be a number");
+        } else if (parsedValue < 1) {
+            setInferenceStepsError("At least 1 inference step required");
+        } else if (parsedValue > 100) {
+            setInferenceStepsError("Maximum 100 inference steps allowed");
+        } else {
+            setInferenceStepsError(null);
             setNumInferenceSteps(parsedValue);
         }
+    }
+    
+    /**
+     * Check if there are any validation errors
+     * @returns {boolean} True if there are no validation errors
+     */
+    function hasValidationErrors() {
+        return !!(widthError || heightError || numImagesError || inferenceStepsError || !prompt);
     }
 	
 	/**
@@ -209,7 +265,7 @@ function App() {
 							<Button 
 								className="generate-button" 
 								onClick={generateImages}
-								disabled={!prompt || loading}
+								disabled={!prompt || loading || hasValidationErrors()}
 							>
 								{loading ? "Generating..." : "Generate Images"}
 							</Button>
@@ -254,14 +310,20 @@ function App() {
 														maxValue={1024}
 														step={64}
 														value={width}
-														onChange={(value) => setWidth(value)}
+														onChange={(value) => {
+															setWidth(value);
+															setWidthInput(value.toString());
+															setWidthError(null);
+														}}
 													/>
 													<TextBox
 														className="parameter-value-input"
-														value={width.toString()}
+														value={widthInput}
 														onChange={handleWidthChange}
 														suffix="px"
 														width={80}
+														error={!!widthError}
+														helperText={widthError}
 													/>
 												</div>
 
@@ -273,14 +335,20 @@ function App() {
 														maxValue={1024}
 														step={64}
 														value={height}
-														onChange={(value) => setHeight(value)}
+														onChange={(value) => {
+															setHeight(value);
+															setHeightInput(value.toString());
+															setHeightError(null);
+														}}
 													/>
 													<TextBox
 														className="parameter-value-input"
-														value={height.toString()}
+														value={heightInput}
 														onChange={handleHeightChange}
 														suffix="px"
 														width={80}
+														error={!!heightError}
+														helperText={heightError}
 													/>
 												</div>
 
@@ -292,13 +360,19 @@ function App() {
 														maxValue={4}
 														step={1}
 														value={numImages}
-														onChange={(value) => setNumImages(value)}
+														onChange={(value) => {
+															setNumImages(value);
+															setNumImagesInput(value.toString());
+															setNumImagesError(null);
+														}}
 													/>
 													<TextBox
 														className="parameter-value-input"
-														value={numImages.toString()}
+														value={numImagesInput}
 														onChange={handleNumImagesChange}
 														width={80}
+														error={!!numImagesError}
+														helperText={numImagesError}
 													/>
 												</div>
 
@@ -310,13 +384,19 @@ function App() {
 														maxValue={100}
 														step={1}
 														value={numInferenceSteps}
-														onChange={(value) => setNumInferenceSteps(value)}
+														onChange={(value) => {
+															setNumInferenceSteps(value);
+															setInferenceStepsInput(value.toString());
+															setInferenceStepsError(null);
+														}}
 													/>
 													<TextBox
 														className="parameter-value-input"
-														value={numInferenceSteps.toString()}
+														value={inferenceStepsInput}
 														onChange={handleInferenceStepsChange}
 														width={80}
+														error={!!inferenceStepsError}
+														helperText={inferenceStepsError}
 													/>
 												</div>
 											</div>

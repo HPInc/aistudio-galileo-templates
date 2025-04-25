@@ -74,8 +74,10 @@
 
 .parameter-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  min-height: 60px;
+  margin-bottom: 10px;
 }
 
 .parameter-label {
@@ -94,8 +96,8 @@
 }
 
 .parameter-value-input {
-  width: 80px;
-  min-width: 80px;
+  width: 100px;
+  min-width: 100px;
   margin-left: 10px;
   text-align: right;
 }
