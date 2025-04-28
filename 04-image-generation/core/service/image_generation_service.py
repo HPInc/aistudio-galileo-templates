@@ -12,10 +12,8 @@ import pandas as pd
 import base64
 from typing import Dict, List, Any, Union, Optional
 
-# Import base service class if needed
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
-# from src.service.base_service import BaseGenerativeService
 
 # Configure logging
 logging.basicConfig(
