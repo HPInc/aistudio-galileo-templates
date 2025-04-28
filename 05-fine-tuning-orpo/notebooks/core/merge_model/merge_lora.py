@@ -13,14 +13,23 @@ def merge_lora_and_save(
     add_chat_template: bool = True
 ):
     """
-    Merge LoRA weights into base model and save locally.
+    Merges LoRA fine-tuned weights into a base model and saves the resulting model locally.
+
+    This function supports:
+    - Automatic memory cleanup before loading models.
+    - Resizing token embeddings if vocabulary sizes mismatch.
+    - Adding a chat template format (if missing) for chat-style models.
 
     Args:
-        base_model_id (str): HF model ID or local path to base model.
-        finetuned_lora_path (str): Path to directory with LoRA adapter weights.
-        base_local_dir (str): Base path where merged model will be saved.
-        use_bfloat16 (bool): Use bfloat16 if supported, otherwise fallback to float16.
-        add_chat_template (bool): Apply chat template if not present in tokenizer.
+        base_model_id (str): Hugging Face model ID or local path to the base model.
+        finetuned_lora_path (str): Directory path containing LoRA adapter weights.
+        base_local_dir (str, optional): Base directory where the merged model will be saved. 
+            If None, a default path under `local/models_llora/` will be used.
+        use_bfloat16 (bool, optional): If True, uses bfloat16 precision; otherwise uses float16. Defaults to False.
+        add_chat_template (bool, optional): Whether to apply a chat template if the tokenizer lacks one. Defaults to True.
+
+    Raises:
+        RuntimeError: If model or tokenizer loading fails.
     """
     print("🧹 Cleaning up memory...")
     gc.collect()
@@ -28,35 +37,45 @@ def merge_lora_and_save(
 
     torch_dtype = torch.bfloat16 if use_bfloat16 else torch.float16
 
-    print("🔄 Loading tokenizer and base model...")
-    tokenizer = AutoTokenizer.from_pretrained(base_model_id)
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model_id,
-        low_cpu_mem_usage=True,
-        return_dict=True,
-        torch_dtype=torch_dtype,
-        device_map="auto"
-    )
+    print("🔄 Loading base tokenizer and model...")
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model_id,
+            low_cpu_mem_usage=True,
+            return_dict=True,
+            torch_dtype=torch_dtype,
+            device_map="auto"
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to load base model or tokenizer: {e}")
 
+    # Ensure the model and tokenizer vocabularies are aligned
     vocab_size_tokenizer = len(tokenizer)
     vocab_size_model = model.get_input_embeddings().num_embeddings
     if vocab_size_tokenizer != vocab_size_model:
         print(f"⚠️ Resizing token embeddings: model ({vocab_size_model}) → tokenizer ({vocab_size_tokenizer})")
         model.resize_token_embeddings(vocab_size_tokenizer)
 
+    # Optionally apply chat template formatting
     if add_chat_template:
-        if tokenizer.chat_template is None:
-            print("💬 Applying chat format...")
+        if getattr(tokenizer, "chat_template", None) is None:
+            print("💬 Applying chat template format...")
             model, tokenizer = setup_chat_format(model, tokenizer)
         else:
-            print("⚠️ Tokenizer already has chat_template. Skipping setup_chat_format.")
+            print("⚠️ Tokenizer already contains a chat_template. Skipping setup.")
 
-    print("🔗 Loading LoRA weights from:", finetuned_lora_path)
-    model = PeftModel.from_pretrained(model, finetuned_lora_path)
+    # Load and merge LoRA weights
+    print(f"🔗 Loading LoRA fine-tuned weights from: {finetuned_lora_path}")
+    try:
+        model = PeftModel.from_pretrained(model, finetuned_lora_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load LoRA weights: {e}")
 
-    print("🧠 Merging LoRA weights...")
+    print("🧠 Merging LoRA weights into the base model...")
     model = model.merge_and_unload()
 
+    # Define save path
     base_model_name = base_model_id.split("/")[-1]
     merged_model_name = f"Orpo-{base_model_name}-FT"
     save_path = os.path.join(
@@ -65,8 +84,9 @@ def merge_lora_and_save(
     )
     os.makedirs(save_path, exist_ok=True)
 
+    # Save merged model and tokenizer
     print(f"💾 Saving merged model to: {save_path}")
     model.save_pretrained(save_path)
     tokenizer.save_pretrained(save_path)
 
-    print("✅ Finished! Model successfully merged and saved locally.")
+    print("✅ Merge complete! Model successfully saved locally.")

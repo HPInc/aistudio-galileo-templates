@@ -7,70 +7,73 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from mlflow.types import Schema, ColSpec
 from mlflow.models import ModelSignature
 
-# Basic logging configuration
+# Setup logging format
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class LLMComparisonModel(mlflow.pyfunc.PythonModel):
     """
-    MLflow-compatible class for serving and comparing two LLMs:
-    - A base model (no fine-tuning)
-    - A fine-tuned version
+    A MLflow-compatible PythonModel for serving and comparing two LLMs:
+    - A base model (pretrained, no fine-tuning)
+    - A fine-tuned model (adapted for a specific task)
 
-    This model can dynamically switch between the two based on input flags,
-    allowing side-by-side evaluation or production routing.
+    The model dynamically switches between the two depending on the input request,
+    enabling side-by-side evaluation or production routing.
     """
 
     def load_context(self, context):
         """
-        Loads both the base and fine-tuned models from provided artifacts.
+        Loads both the base and fine-tuned models along with their tokenizers from provided artifacts.
 
         Args:
-            context (mlflow.pyfunc.PythonModelContext): MLflow context object containing model paths.
+            context (mlflow.pyfunc.PythonModelContext): MLflow context object containing artifact paths.
         """
         self.model_base_path = context.artifacts["model_no_finetuning"]
         self.model_finetuned_path = context.artifacts["finetuned_model"]
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        logging.info(f"Loading models to device: {self.device}")
+        logging.info(f"Loading models onto device: {self.device}")
 
+        # Load base model and tokenizer
         self.tokenizer_base = AutoTokenizer.from_pretrained(self.model_base_path)
         self.model_base = AutoModelForCausalLM.from_pretrained(self.model_base_path).to(self.device)
 
+        # Load fine-tuned model and tokenizer
         self.tokenizer_ft = AutoTokenizer.from_pretrained(self.model_finetuned_path)
         self.model_ft = AutoModelForCausalLM.from_pretrained(self.model_finetuned_path).to(self.device)
 
+        # Initialize placeholders for dynamic switching
         self.current_model = None
         self.current_tokenizer = None
 
-    def load_model(self, use_finetuning):
+    def load_model(self, use_finetuning: bool):
         """
-        Switches the current model and tokenizer depending on the flag.
+        Sets the current model and tokenizer based on whether fine-tuning is requested.
 
         Args:
-            use_finetuning (bool): Whether to use the fine-tuned model or the base model.
+            use_finetuning (bool): If True, load the fine-tuned model; otherwise, load the base model.
         """
         if use_finetuning:
             self.current_model = self.model_ft
             self.current_tokenizer = self.tokenizer_ft
-            logging.info("Using fine-tuned model.")
+            logging.info("Switched to fine-tuned model.")
         else:
             self.current_model = self.model_base
             self.current_tokenizer = self.tokenizer_base
-            logging.info("Using base model.")
+            logging.info("Switched to base model.")
 
-    def predict(self, context, model_input):
+    def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
         """
-        Generates a response using either the base or fine-tuned model.
+        Generates a model output based on the selected model (base or fine-tuned).
 
         Args:
             context (Unused): MLflow context.
-            model_input (pd.DataFrame): DataFrame with columns:
-                - prompt (str)
-                - use_finetuning (bool)
-                - max_tokens (int, optional)
+            model_input (pd.DataFrame): Input DataFrame containing:
+                - 'prompt' (str): The input text.
+                - 'use_finetuning' (bool): Whether to use the fine-tuned model.
+                - 'max_tokens' (int, optional): Maximum number of tokens to generate.
 
         Returns:
-            pd.DataFrame: Single-column DataFrame with the generated response.
+            pd.DataFrame: Output DataFrame with a single column 'response' containing the generated text.
         """
         prompt = model_input["prompt"].iloc[0] if isinstance(model_input["prompt"], pd.Series) else model_input["prompt"]
         use_finetuning = model_input["use_finetuning"].iloc[0] if isinstance(model_input["use_finetuning"], pd.Series) else model_input["use_finetuning"]
@@ -78,10 +81,13 @@ class LLMComparisonModel(mlflow.pyfunc.PythonModel):
         if isinstance(max_tokens, pd.Series):
             max_tokens = max_tokens.iloc[0]
 
+        # Select the correct model
         self.load_model(use_finetuning)
 
+        # Tokenize input
         inputs = self.current_tokenizer(prompt, return_tensors="pt").to(self.device)
 
+        # Generate output without gradient tracking
         with torch.no_grad():
             output_ids = self.current_model.generate(
                 **inputs,
@@ -90,27 +96,28 @@ class LLMComparisonModel(mlflow.pyfunc.PythonModel):
                 pad_token_id=self.current_tokenizer.eos_token_id
             )
 
+        # Decode and return the output
         output_text = self.current_tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        logging.info(f"Inference done: {output_text[:80]}...")
+        logging.info(f"Inference completed: {output_text[:80]}...")
         return pd.DataFrame({"response": [output_text]})
 
 
 def register_llm_comparison_model(
-    model_base_path,
-    model_finetuned_path,
-    experiment_name="LLM-Finetune-Comparison",
-    run_name="llm_serving",
-    model_name="LLMComparisonService"
+    model_base_path: str,
+    model_finetuned_path: str,
+    experiment_name: str = "LLM-Finetune-Comparison",
+    run_name: str = "llm_serving",
+    model_name: str = "LLMComparisonService"
 ):
     """
-    Logs and registers a MLflow model capable of serving both base and fine-tuned LLMs.
+    Logs and registers a MLflow PyFunc model capable of serving both base and fine-tuned LLMs.
 
     Args:
-        model_base_path (str): Path to the base (non-finetuned) model.
+        model_base_path (str): Path to the pretrained base model (no fine-tuning).
         model_finetuned_path (str): Path to the fine-tuned model.
-        experiment_name (str): Name of the MLflow experiment.
-        run_name (str): Name of the run.
-        model_name (str): Registered model name.
+        experiment_name (str, optional): Name of the MLflow experiment. Default is "LLM-Finetune-Comparison".
+        run_name (str, optional): Name of the MLflow run. Default is "llm_serving".
+        model_name (str, optional): Name to register the model under in MLflow. Default is "LLMComparisonService".
 
     Returns:
         None
@@ -118,24 +125,26 @@ def register_llm_comparison_model(
     mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run(run_name=run_name) as run:
-        logging.info(f"MLflow Run started: {run.info.run_id}")
+        logging.info(f"Started MLflow run: {run.info.run_id}")
 
-        # Define input/output schema
+        # Define input and output schemas
         input_schema = Schema([
             ColSpec("string", "prompt"),
             ColSpec("boolean", "use_finetuning"),
             ColSpec("integer", "max_tokens"),
         ])
-        output_schema = Schema([ColSpec("string", "response")])
+        output_schema = Schema([
+            ColSpec("string", "response")
+        ])
         signature = ModelSignature(inputs=input_schema, outputs=output_schema)
 
-        # Define artifacts
+        # Artifacts to bundle the models
         artifacts = {
             "finetuned_model": model_finetuned_path,
             "model_no_finetuning": model_base_path,
         }
 
-        # Log the model
+        # Log the model with MLflow
         mlflow.pyfunc.log_model(
             artifact_path="llm_serving_model",
             python_model=LLMComparisonModel(),
@@ -144,7 +153,7 @@ def register_llm_comparison_model(
             pip_requirements=["torch", "transformers", "mlflow", "pandas"]
         )
 
-        # Register the model
+        # Register the model in the MLflow Model Registry
         model_uri = f"runs:/{run.info.run_id}/llm_serving_model"
         mlflow.register_model(model_uri=model_uri, name=model_name)
-        logging.info(f"✅ Model registered: {model_name}")
+        logging.info(f"✅ Model successfully registered as: {model_name}")

@@ -5,20 +5,29 @@ from sentence_transformers import SentenceTransformer, util
 
 class UltraFeedbackVisualizer:
     """
-    Logs human feedback data from the UltraFeedback dataset into TensorBoard
-    for better understanding and presentation of preferred vs. rejected model responses.
+    A class to log human feedback data from the UltraFeedback dataset into TensorBoard,
+    enabling visual comparison between preferred (chosen) and rejected model responses.
 
-    It uses `score_chosen` and `score_rejected` to plot charts and markdown summaries
-    that are easy to interpret, even by non-technical audiences.
+    This tool highlights `score_chosen` vs. `score_rejected` differences through charts 
+    and markdown summaries, making the results accessible even for non-technical audiences.
 
     Attributes:
-        train_dataset (Dataset): Subset of the UltraFeedback training data.
-        test_dataset (Dataset): Subset of the UltraFeedback test data.
-        log_dir (str): Path to the TensorBoard log directory.
-        max_samples (int): Maximum number of examples to visualize.
+        train_dataset (Dataset): Subset of UltraFeedback training samples.
+        test_dataset (Dataset): Subset of UltraFeedback testing samples.
+        log_dir (str): Directory path for saving TensorBoard logs.
+        max_samples (int): Maximum number of samples to visualize from each dataset.
     """
-    
+
     def __init__(self, train_dataset, test_dataset, log_dir="/phoenix/tensorboard/tensorlogs", max_samples=20):
+        """
+        Initializes the UltraFeedbackVisualizer.
+
+        Args:
+            train_dataset (Dataset): The training split of UltraFeedback.
+            test_dataset (Dataset): The testing split of UltraFeedback.
+            log_dir (str, optional): Directory to save TensorBoard logs. Defaults to "/phoenix/tensorboard/tensorlogs".
+            max_samples (int, optional): Maximum number of examples to log per split. Defaults to 20.
+        """
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.log_dir = log_dir
@@ -33,15 +42,15 @@ class UltraFeedbackVisualizer:
 
     def _extract_text(self, field, field_name="unknown", idx=0):
         """
-        Safely extracts and normalizes text content from fields that may be strings, dicts, or lists.
+        Safely extracts and normalizes text from various formats (string, dictionary, list).
 
         Args:
-            field (Union[str, dict, list]): The text or structured field.
-            field_name (str): Field label (for logging).
-            idx (int): Example index (for debugging).
+            field (Union[str, dict, list]): The field containing the text.
+            field_name (str, optional): Name of the field for logging purposes. Defaults to "unknown".
+            idx (int, optional): Index of the example for debug logging. Defaults to 0.
 
         Returns:
-            str: Normalized text string.
+            str: The extracted and normalized text string.
         """
         try:
             if isinstance(field, dict) and "text" in field:
@@ -58,11 +67,14 @@ class UltraFeedbackVisualizer:
 
     def log_dataset(self, dataset, tag_prefix="train"):
         """
-        Logs a subset of dataset examples into TensorBoard as text, scalar scores, and differences.
+        Logs a subset of dataset examples into TensorBoard, including:
+        - Scalar scores for chosen and rejected responses.
+        - Delta score between chosen and rejected.
+        - Markdown visual summaries for each example.
 
         Args:
-            dataset (Dataset): The dataset split to log (train or test).
-            tag_prefix (str): TensorBoard tag namespace (e.g., "train" or "test").
+            dataset (Dataset): The dataset split to log (e.g., train or test).
+            tag_prefix (str, optional): Namespace prefix for TensorBoard tags. Defaults to "train".
         """
         score_chosen_list = []
         score_rejected_list = []
@@ -81,14 +93,14 @@ class UltraFeedbackVisualizer:
                 score_rejected_list.append(score_rejected)
                 score_delta_list.append(delta)
 
-                # 🔢 Log the delta score (how much better the chosen response was)
+                # Log delta score
                 self.writer.add_scalar(f"{tag_prefix}/ScoreDelta/Example_{idx}", delta, global_step=idx)
 
-                # 📈 Log chosen/rejected raw scores
+                # Log raw scores
                 self.writer.add_scalar(f"{tag_prefix}/Score/Chosen", score_chosen, global_step=idx)
                 self.writer.add_scalar(f"{tag_prefix}/Score/Rejected", score_rejected, global_step=idx)
 
-                # 📝 Pretty markdown summary to visualize the result
+                # Prepare markdown summary
                 preferred_tag = "🟢 Chosen" if delta >= 0 else "🔴 Rejected"
                 markdown_text = f"""
 ### ❓ Prompt:
@@ -96,27 +108,27 @@ class UltraFeedbackVisualizer:
 
 ---
 
-### 🟢 Chosen (score: {score_chosen:.1f}):
+### 🟢 Chosen (Score: {score_chosen:.1f}):
 {chosen}
 
 ---
 
-### 🔴 Rejected (score: {score_rejected:.1f}):
+### 🔴 Rejected (Score: {score_rejected:.1f}):
 {rejected}
 
 ---
 
-🏁 **Humans preferred:** {preferred_tag}  
-📉 Score difference: **{delta:.2f} points**
+🏁 **Human preference:** {preferred_tag}  
+📉 **Score difference:** {delta:.2f} points
 """
 
-                self.writer.add_text(f"{tag_prefix}/example_{idx}/Visual", markdown_text, global_step=idx)
-                self.logger.info(f"[Example {idx}] ✅ Logged successfully")
+                self.writer.add_text(f"{tag_prefix}/Example_{idx}/Visual", markdown_text, global_step=idx)
+                self.logger.info(f"[Example {idx}] ✅ Logged successfully.")
 
             except Exception as e:
                 self.logger.error(f"[Example {idx}] ❌ Failed to process example: {e}")
 
-        # 📊 Log mean summary scores for all samples
+        # Log average scores
         if score_chosen_list:
             self.writer.add_scalar(f"summary/{tag_prefix}_mean_chosen", sum(score_chosen_list) / len(score_chosen_list))
         if score_rejected_list:
@@ -126,15 +138,21 @@ class UltraFeedbackVisualizer:
 
     def run(self):
         """
-        Executes the full logging pipeline for both train and test splits.
+        Executes the full logging workflow:
+        - Logs training samples.
+        - Logs testing samples.
+        - Finalizes the TensorBoard writer.
+
+        Launch TensorBoard to visualize the logs using:
+        tensorboard --logdir=<log_dir> --port 6006
         """
-        self.logger.info("📊 Logging training samples (human feedback only)...")
+        self.logger.info("📊 Logging training samples (human feedback)...")
         self.log_dataset(self.train_dataset, tag_prefix="train")
 
-        self.logger.info("📊 Logging test samples (human feedback only)...")
+        self.logger.info("📊 Logging test samples (human feedback)...")
         self.log_dataset(self.test_dataset, tag_prefix="test")
 
         self.writer.close()
-        self.logger.info(f"✅ Human feedback exploration complete!\n"
-                         f"Launch TensorBoard with:\n"
+        self.logger.info(f"✅ Human feedback logging complete!\n"
+                         f"To visualize, run:\n"
                          f"tensorboard --logdir={self.log_dir} --port 6006")

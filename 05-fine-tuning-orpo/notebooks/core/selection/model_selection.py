@@ -1,14 +1,16 @@
+import os
+import torch
+import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import snapshot_download
 from huggingface_hub.utils import HfHubHTTPError
-import os
-import logging
 
 
 class ModelAccessException(Exception):
     """
     Custom exception raised when access to a Hugging Face model repository is restricted.
     """
+
     def __init__(self, model_id, message="Access to this model is restricted."):
         self.model_id = model_id
         self.message = f"{message} Please request access at: https://huggingface.co/{model_id}"
@@ -17,17 +19,24 @@ class ModelAccessException(Exception):
 
 class ModelSelector:
     """
-    Handles selection, download, loading, and compatibility checking of pre-trained LLMs
-    from Hugging Face. Supports offline storage, logging, and ORPO compatibility validation.
+    Handles the selection, download, loading, and compatibility checking of pre-trained LLMs
+    from Hugging Face. Supports offline storage, structured logging, and ORPO compatibility validation.
+
+    Attributes:
+        model_list (list[str]): List of allowed Hugging Face model IDs.
+        base_local_dir (str): Local directory where models are stored.
+        model_id (str): Currently selected model ID.
+        model (PreTrainedModel): Loaded Hugging Face model instance.
+        tokenizer (PreTrainedTokenizer): Loaded tokenizer instance.
     """
 
     def __init__(self, model_list=None, base_local_dir=None):
         """
-        Initialize the selector with available models and a base path for storing them locally.
+        Initializes the ModelSelector.
 
         Args:
             model_list (list[str], optional): List of supported model IDs. Defaults to a curated list.
-            base_local_dir (str, optional): Path to store downloaded models. Defaults to "../../../local/models".
+            base_local_dir (str, optional): Directory to store downloaded models. Defaults to '../../../local/models'.
         """
         self.model_list = model_list or [
             "mistralai/Mistral-7B-Instruct-v0.1",
@@ -44,32 +53,37 @@ class ModelSelector:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger("ModelSelector")
 
-    def log(self, message):
-        """Helper to log messages with a consistent tag."""
+    def log(self, message: str):
+        """
+        Logs a message using the ModelSelector logger.
+
+        Args:
+            message (str): Message to log.
+        """
         self.logger.info(f"[ModelSelector] {message}")
 
     def format_model_path(self, model_id: str) -> str:
         """
-        Converts a Hugging Face model ID into a safe local directory path.
+        Converts a Hugging Face model ID into a valid local directory path.
 
         Args:
-            model_id (str): The Hugging Face model repo ID (e.g., "meta-llama/Llama-2").
+            model_id (str): Hugging Face model repo ID.
 
         Returns:
-            str: Local path to store the model snapshot.
+            str: Local filesystem path.
         """
         model_dir_name = model_id.replace("/", "__")
         return os.path.join(self.base_local_dir, model_dir_name)
 
     def select_model(self, model_id: str):
         """
-        Main entry point. Validates, downloads, loads, and checks compatibility of a model.
+        Main entry point to select, download, load, and validate a model.
 
         Args:
-            model_id (str): Hugging Face model ID to use.
+            model_id (str): Hugging Face model ID.
 
         Raises:
-            ValueError: If model_id is not in the supported list.
+            ValueError: If the model is not allowed.
         """
         self.log(f"Selected model: {model_id}")
         if model_id not in self.model_list:
@@ -82,14 +96,14 @@ class ModelSelector:
 
     def download_model(self) -> str:
         """
-        Downloads the model snapshot using Hugging Face Hub into the local models directory.
+        Downloads a model snapshot from Hugging Face Hub into the local directory.
 
         Returns:
-            str: Path to the downloaded model snapshot.
+            str: Path to the local model directory.
 
         Raises:
-            ModelAccessException: If the model is gated (403/401).
-            RuntimeError: For other download failures.
+            ModelAccessException: If access to the model is restricted.
+            RuntimeError: For unexpected download failures.
         """
         model_path = self.format_model_path(self.model_id)
         self.log(f"Downloading model snapshot to: {model_path}")
@@ -102,22 +116,22 @@ class ModelSelector:
                 etag_timeout=60,
                 local_dir_use_symlinks=False
             )
-            self.log(f"✅ Model downloaded to: {model_path}")
+            self.log(f"✅ Model downloaded successfully to: {model_path}")
             return model_path
 
         except HfHubHTTPError as e:
             if "401" in str(e) or "403" in str(e):
                 raise ModelAccessException(self.model_id)
-            raise RuntimeError(f"Unexpected Hugging Face error: {e}")
+            raise RuntimeError(f"Unexpected Hugging Face HTTP error: {e}")
         except Exception as e:
             raise RuntimeError(f"Download failed for {self.model_id}: {e}")
 
     def load_model(self, model_path: str):
         """
-        Loads the model and tokenizer from the local path.
+        Loads the model and tokenizer from a given local path.
 
         Args:
-            model_path (str): Local directory where the model is stored.
+            model_path (str): Path to the local model directory.
 
         Raises:
             RuntimeError: If loading fails.
@@ -131,13 +145,13 @@ class ModelSelector:
 
     def check_compatibility(self):
         """
-        Checks if the model has a `chat_template`, which is required for ORPO-style formatting.
+        Validates if the loaded model supports ORPO (chat template required).
 
         Raises:
-            ValueError: If no chat_template is found.
+            ValueError: If the model lacks a chat_template.
         """
-        self.log("Checking for ORPO compatibility...")
-        if self.tokenizer.chat_template is None:
+        self.log("Checking model for ORPO compatibility...")
+        if getattr(self.tokenizer, "chat_template", None) is None:
             raise ValueError(f"The model '{self.model_id}' is missing a chat_template.")
         self.log(f"✅ Model '{self.model_id}' is ORPO-compatible.")
 
@@ -146,7 +160,7 @@ class ModelSelector:
         Returns the loaded model instance.
 
         Returns:
-            PreTrainedModel: The currently selected model.
+            PreTrainedModel: Loaded model.
         """
         return self.model
 
@@ -155,6 +169,6 @@ class ModelSelector:
         Returns the loaded tokenizer instance.
 
         Returns:
-            PreTrainedTokenizer: The currently selected tokenizer.
+            PreTrainedTokenizer: Loaded tokenizer.
         """
         return self.tokenizer

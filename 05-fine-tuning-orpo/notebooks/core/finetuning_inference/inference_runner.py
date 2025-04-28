@@ -3,80 +3,88 @@ import torch
 import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
-from accelerate import init_empty_weights, infer_auto_device_map, load_checkpoint_and_dispatch
-from huggingface_hub import snapshot_download
-
 
 class AcceleratedInferenceRunner:
-    def __init__(self, base_model_path, finetuned_path=None, dtype=torch.float16, max_memory=None, base_local_dir=None):
-        self.original_model_id = base_model_path
-        self.base_local_dir = base_local_dir or os.path.join("..", "..", "..", "local", "models")
+    """
+    A lightweight inference runner that loads a base model using a ModelSelector
+    and optionally applies LoRA fine-tuned weights.
 
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger("AcceleratedInferenceRunner")  
+    Designed for accelerated local inference with support for mixed precision (e.g., float16).
+    
+    Attributes:
+        model_selector (ModelSelector): Provides model loading utilities.
+        finetuned_path (str, optional): Path to the fine-tuned LoRA adapter weights.
+        device (str): Device to run inference on ("cuda" or "cpu").
+        dtype (torch.dtype): Data type for inference (default: torch.float16).
+        model (PreTrainedModel): Loaded transformer model instance.
+        tokenizer (PreTrainedTokenizer): Loaded tokenizer instance.
+    """
 
-        self.base_model_path = self.resolve_model_path(base_model_path)
+    def __init__(self, model_selector, finetuned_path=None, dtype=torch.float16):
+        """
+        Initializes the AcceleratedInferenceRunner.
+
+        Args:
+            model_selector (ModelSelector): Instance of a ModelSelector used to load the model.
+            finetuned_path (str, optional): Path to a directory containing LoRA fine-tuned weights.
+            dtype (torch.dtype, optional): Torch data type for inference precision. Defaults to torch.float16.
+        """
+        self.model_selector = model_selector
         self.finetuned_path = finetuned_path
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.dtype = dtype
-        self.max_memory = max_memory or self._auto_max_memory()
         self.model = None
         self.tokenizer = None
-
 
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger("AcceleratedInferenceRunner")
 
-    def _auto_max_memory(self):
-        gpu_count = torch.cuda.device_count()
-        default_mem = "40GiB"
-        return {i: default_mem for i in range(gpu_count)} if gpu_count > 0 else {"cpu": "64GiB"}
-
-    def resolve_model_path(self, model_id):
-        local_model_dir = os.path.join(self.base_local_dir, model_id.replace("/", "__"))
-        if os.path.exists(local_model_dir):
-            self.logger.info(f"📦 Using existing local model at: {local_model_dir}")
-            return local_model_dir
-        else:
-            self.logger.info(f"⬇️ Downloading model from Hugging Face Hub: {model_id}")
-            downloaded_path = snapshot_download(model_id, local_dir=local_model_dir, local_dir_use_symlinks=False)
-            self.logger.info(f"✅ Model downloaded to: {downloaded_path}")
-            return local_model_dir
-
     def load_model(self):
-        self.logger.info("🔄 Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.finetuned_path or self.base_model_path)
+        """
+        Loads the base model and tokenizer from the ModelSelector,
+        and applies LoRA fine-tuned weights if provided.
 
-        self.logger.info("📦 Initializing model with Accelerate (empty weights)...")
-        with init_empty_weights():
-            model = AutoModelForCausalLM.from_pretrained(self.base_model_path)
+        Raises:
+            FileNotFoundError: If LoRA adapter config is expected but missing.
+        """
+        self.logger.info("🔄 Loading tokenizer and base model from ModelSelector...")
 
-        self.logger.info("🧠 Inferring device map with memory limits: %s", self.max_memory)
-        device_map = infer_auto_device_map(
-            model,
-            max_memory=self.max_memory,
-            no_split_module_classes=["LlamaDecoderLayer"]
-        )
+        model_path = self.model_selector.format_model_path(self.model_selector.model_id)
 
-        self.logger.info(f"🚀 Dispatching model with device_map: {device_map}")
-        model = load_checkpoint_and_dispatch(
-            model,
-            self.base_model_path,
-            device_map=device_map,
-            dtype=self.dtype
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=self.dtype
+        ).to(self.device)
 
         if self.finetuned_path:
-            self.logger.info("🎯 Applying LoRA fine-tuned weights...")
-            model = PeftModel.from_pretrained(model, self.finetuned_path)
+            adapter_config_path = os.path.join(self.finetuned_path, "adapter_config.json")
+            if os.path.exists(adapter_config_path):
+                self.logger.info("🎯 Applying LoRA fine-tuned weights...")
+                self.model = PeftModel.from_pretrained(self.model, self.finetuned_path)
+            else:
+                self.logger.warning(f"⚠️ No adapter_config.json found at {self.finetuned_path}. Skipping LoRA application.")
 
-        self.model = model.eval()
+        self.model = self.model.eval()
+        self.logger.info("✅ Model loaded and ready for inference.")
 
-    def infer(self, prompt, max_new_tokens=100, temperature=0.7):
+    def infer(self, prompt: str, max_new_tokens: int = 100, temperature: float = 0.7) -> str:
+        """
+        Runs inference for a given prompt using the loaded model.
+
+        Args:
+            prompt (str): Input prompt text.
+            max_new_tokens (int, optional): Maximum number of tokens to generate. Defaults to 100.
+            temperature (float, optional): Sampling temperature (controls randomness). Defaults to 0.7.
+
+        Returns:
+            str: The generated output text from the model.
+        """
         if self.model is None or self.tokenizer is None:
             self.load_model()
 
-        self.logger.info(f"🔍 Running inference for prompt: {prompt[:80]}...")
+        self.logger.info(f"🔍 Running inference for prompt (truncated): {prompt[:80]}...")
+
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
         with torch.no_grad():
