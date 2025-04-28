@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, TextBox } from '@veneer/core';
 import { IconInfo } from '@veneer/core';
+import { Tooltip } from '@veneer/core';
 import { Toggle } from '@veneer/core';
 import { Button } from '@veneer/core';
 import { Slider } from '@veneer/core';
@@ -39,36 +40,15 @@ function App() {
 	
 	// State for UI display toggles
 	const [showDetails, setShowDetails] = useState(false);
-	const [expandedSection, setExpandedSection] = useState(null);
 	
 	/**
-	 * Toggle expanded view for parameters section
-	 */
-	async function toggleParametersInfo() {
-		if (expandedSection !== "parameters-info") {
-			setExpandedSection("parameters-info");
-		} else {
-			setExpandedSection(null);
-		}
-	}
-	
-	/**
-	 * Toggle expanded view for generated images section
-	 */
-	async function toggleImagesInfo() {
-		if (expandedSection !== "generated-images-info") {
-			setExpandedSection("generated-images-info");
-		} else {
-			setExpandedSection(null);
-		}
-	}
-	
-	/**
-	 * Toggle information about the black box mode
+	 * Toggle details view mode
 	 */
 	async function toggleBlackBoxInfo() {
 		setShowDetails(!showDetails);
 	}
+	
+
 	
     /**
      * Handle prompt input change
@@ -88,11 +68,11 @@ function App() {
         
         const parsedValue = parseInt(value, 10);
         if (isNaN(parsedValue) || value === "") {
-            setWidthError("Width must be a number");
+            setWidthError("Must be a number");
         } else if (parsedValue < 128) {
-            setWidthError("Width must be at least 128px");
+            setWidthError("Must be at least 128px");
         } else if (parsedValue > 1024) {
-            setWidthError("Width must be at most 1024px");
+            setWidthError("Must be at most 1024px");
         } else {
             setWidthError(null);
             setWidth(parsedValue);
@@ -108,11 +88,11 @@ function App() {
         
         const parsedValue = parseInt(value, 10);
         if (isNaN(parsedValue) || value === "") {
-            setHeightError("Height must be a number");
+            setHeightError("Must be a number");
         } else if (parsedValue < 128) {
-            setHeightError("Height must be at least 128px");
+            setHeightError("Must be at least 128px");
         } else if (parsedValue > 1024) {
-            setHeightError("Height must be at most 1024px");
+            setHeightError("Must be at most 1024px");
         } else {
             setHeightError(null);
             setHeight(parsedValue);
@@ -128,7 +108,7 @@ function App() {
         
         const parsedValue = parseInt(value, 10);
         if (isNaN(parsedValue) || value === "") {
-            setNumImagesError("Number of images must be a number");
+            setNumImagesError("Must be a number");
         } else if (parsedValue < 1) {
             setNumImagesError("At least 1 image required");
         } else if (parsedValue > 4) {
@@ -148,7 +128,7 @@ function App() {
         
         const parsedValue = parseInt(value, 10);
         if (isNaN(parsedValue) || value === "") {
-            setInferenceStepsError("Inference steps must be a number");
+            setInferenceStepsError("Must be a number");
         } else if (parsedValue < 1) {
             setInferenceStepsError("At least 1 inference step required");
         } else if (parsedValue > 100) {
@@ -221,8 +201,7 @@ function App() {
 		}
 	}
 	
-	const showParametersInfo = expandedSection === "parameters-info";
-	const showGeneratedImagesInfo = expandedSection === "generated-images-info";
+
 	
 	return (
 		<div>
@@ -281,26 +260,31 @@ function App() {
 					content={
 						<div className="main-detail-box">
 							{/* Parameters Card */}
-							<Card className={`parameters-card ${showParametersInfo ? "card-expanded" : "card-not-expanded"}`}
+							<Card className="parameters-card"
 								border="outlined"
 								content={
 									<div className='outer-padding'>
 										<div className='title-with-icon'>
 											<h5>Generation Parameters</h5>
 											<div className='title-with-icon-icon'>
-												{showParametersInfo ? 
-													<IconInfo size={24} onClick={toggleParametersInfo} filled /> :
-													<IconInfo size={24} onClick={toggleParametersInfo} />
-												}
+												<Tooltip
+													arrow
+													placement="trailing-end"
+													content={
+														<span>
+															Adjust these parameters to control the image generation process.
+															Higher resolution values create larger images but take longer to generate.
+														</span>
+													}
+												>
+													<IconInfo 
+														size={24}
+														ltip
+													/>
+												</Tooltip>
 											</div>
 										</div>
 										<div className="parameters-container">
-											{showParametersInfo && 
-												<p>
-													Adjust these parameters to control the image generation process. 
-													Higher resolution values create larger images but take longer to generate.
-												</p>
-											}
 											<div className="parameter-sliders">
 												<div className="parameter-row">
 													<div className="parameter-label">Width:</div>
@@ -406,27 +390,31 @@ function App() {
 							/>
 							
 							{/* Generated Images Card */}
-							<Card className={`parameters-card ${showGeneratedImagesInfo ? "card-expanded" : "card-not-expanded"}`}
+							<Card className="parameters-card"
 								border="outlined"
 								content={
 									<div className='outer-padding'>
 										<div className='title-with-icon'>
 											<h5>Generated Images</h5>
 											<div className='title-with-icon-icon'>
-												{showGeneratedImagesInfo ? 
-													<IconInfo size={24} onClick={toggleImagesInfo} filled /> :
-													<IconInfo size={24} onClick={toggleImagesInfo} />
-												}
+												<Tooltip
+													arrow
+													placement="trailing-end"
+													content={
+														<span>
+															These are your AI-generated images based on the provided prompt and parameters.
+															The quality and style depend on the prompt details and inference steps.
+														</span>
+													}
+												>
+													<IconInfo 
+														size={24}
+														ltip
+													/>
+												</Tooltip>
 											</div>
 										</div>
 										<div className="images-container">
-											{showGeneratedImagesInfo &&
-												<p>
-													These are your AI-generated images based on the provided prompt and parameters.
-													The quality and style depend on the prompt details and inference steps.
-												</p>
-											}
-											
 											{loading ? (
 												<div className="loading-container">
 													<ProgressIndicator
@@ -466,10 +454,23 @@ function App() {
 								<div className='title-with-icon' style={{display:"flex", justifyContent:"center"}}>
 									<h4>Image Generation</h4>
 									<div className='title-with-icon-icon'>
-										{showDetails ? 
-											<IconInfo size={24} onClick={toggleBlackBoxInfo} filled /> :
-											<IconInfo size={24} onClick={toggleBlackBoxInfo} />
-										}
+										<Tooltip
+											arrow
+											placement="trailing-end"
+											content={
+												<span>
+													Toggle between simplified and detailed view modes
+													for more control over image generation parameters.
+												</span>
+											}
+										>
+											<IconInfo 
+												size={24} 
+												onClick={toggleBlackBoxInfo} 
+												filled={showDetails}
+												ltip
+											/>
+										</Tooltip>
 									</div>
 								</div>
 								<div>
