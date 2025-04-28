@@ -13,7 +13,7 @@ class AcceleratedInferenceRunner:
         self.base_local_dir = base_local_dir or os.path.join("..", "..", "..", "local", "models")
 
         logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger("AcceleratedInferenceRunner")  # ✅ mover isso antes
+        self.logger = logging.getLogger("AcceleratedInferenceRunner")  
 
         self.base_model_path = self.resolve_model_path(base_model_path)
         self.finetuned_path = finetuned_path
