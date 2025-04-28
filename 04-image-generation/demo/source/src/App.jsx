@@ -48,8 +48,6 @@ function App() {
 		setShowDetails(!showDetails);
 	}
 	
-
-	
     /**
      * Handle prompt input change
      * @param {string} value - The new input value
