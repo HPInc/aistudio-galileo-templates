@@ -24,16 +24,16 @@ def load_image(image_path: str) -> np.ndarray:
     Loads the image from the given path and converts it to float32 in the range [0, 1].
     """
     try:
-        print(f"[load_image] Carregando a imagem de: {image_path}")
+        print(f"[load_image] Loading the image of: {image_path}")
         image_data = tf.io.read_file(image_path)
         image = tf.image.decode_image(image_data, channels=3)
         image = tf.image.convert_image_dtype(image, tf.float32)
         img_np = image.numpy()
-        print(f"[load_image] Imagem carregada com shape: {img_np.shape}, dtype: {img_np.dtype}")
+        print(f"[load_image] Image loaded with shape: {img_np.shape}, dtype: {img_np.dtype}")
         return img_np
     except Exception as e:
-        print(f"[load_image] Erro ao carregar a imagem: {e}")
-        raise ValueError(f"Erro ao carregar a imagem: {e}")
+        print(f"[load_image] Error loading image: {e}")
+        raise ValueError(f"Error loading image:: {e}")
 
 def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
     """
