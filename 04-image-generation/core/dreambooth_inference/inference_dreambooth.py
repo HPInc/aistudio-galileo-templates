@@ -64,7 +64,7 @@ def display_generated_images(images: List[Image.Image]):
     plt.show()
 
 
-def run_inference_dreambooth(prompt=None, height=512, width=512, num_images=5, num_inference_steps=50, output=True):
+def run_inference_dreambooth(prompt=None, height=512, width=512, num_images=5, num_inference_steps=50, output=True, model_path=None):
     default_prompt = (
         "A sleek, modern laptop open on a sandy beach, positioned in front of a vibrant blue ocean. "
         "The sun is shining brightly, casting soft shadows across the sand. The screen of the laptop "
@@ -79,7 +79,8 @@ def run_inference_dreambooth(prompt=None, height=512, width=512, num_images=5, n
     accelerator = Accelerator()
     max_memory = get_max_memory_per_gpu()
 
-    model_id = "./dreambooth"
+    # Use the provided model path or default to "./dreambooth" with os.path.abspath to make it an absolute path
+    model_id = model_path if model_path else os.path.abspath("./dreambooth")
 
     pipe = StableDiffusionPipeline.from_pretrained(
         model_id,
