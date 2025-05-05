@@ -361,10 +361,19 @@ class ImageGenerationModel(mlflow.pyfunc.PythonModel):
 def setup_accelerate():
     try:
         logging.info("Setting up accelerate...")
-        subprocess.run(["pip", "install", "accelerate"], check=True)
+        # Try to install accelerate, but don't fail if it's already installed
+        try:
+            subprocess.run(["pip", "install", "accelerate"], check=False)
+        except Exception as e:
+            logging.warning(f"Could not install accelerate: {str(e)}. Will continue anyway.")
         
-        num_gpus = torch.cuda.device_count()
-        logging.info(f"Detected {num_gpus} GPU(s)")
+        # Try to detect GPUs, default to 0 if CUDA is not available
+        try:
+            num_gpus = torch.cuda.device_count()
+            logging.info(f"Detected {num_gpus} GPU(s)")
+        except Exception as e:
+            logging.warning(f"Could not detect GPUs: {str(e)}. Defaulting to CPU mode.")
+            num_gpus = 0
         
         # Base directory for config files
         config_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "configs")
@@ -413,12 +422,27 @@ def setup_accelerate():
         # Set accelerate config file environment variable
         logging.info(f"Setting ACCELERATE_CONFIG_FILE to: {config_file}")
         os.environ['ACCELERATE_CONFIG_FILE'] = config_file
+        return config_file
     except Exception as e:
         logging.error(f"Error setting up accelerate: {str(e)}")
         logging.error(f"Exception type: {type(e).__name__}")
         import traceback
         logging.error(f"Traceback: {traceback.format_exc()}")
-        raise
+        # Create a default config file in /tmp if the normal one fails
+        try:
+            default_config = "/tmp/default_accelerate_config.yaml"
+            with open(default_config, "w") as f:
+                f.write("compute_environment: LOCAL_MACHINE\n")
+                f.write("distributed_type: NO\n")
+                f.write("mixed_precision: no\n")
+                f.write("use_cpu: true\n")
+            logging.warning(f"Created fallback accelerate config at: {default_config}")
+            os.environ['ACCELERATE_CONFIG_FILE'] = default_config
+            return default_config
+        except Exception as inner_e:
+            logging.error(f"Could not create default accelerate config: {str(inner_e)}")
+            # Don't re-raise, allow the process to continue
+            return None
 
 def deploy_model(demo_folder=None, finetuned_model_path=None, model_no_finetuning_path=None):
     """
@@ -487,8 +511,18 @@ def deploy_model(demo_folder=None, finetuned_model_path=None, model_no_finetunin
     
     with mlflow.start_run(run_name='image_generation_service') as run:
         logging.info("Run started: %s", run.info.run_id)
-        mlflow.log_artifact(os.environ['ACCELERATE_CONFIG_FILE'], artifact_path="accelerate_config")
-        logging.info("Accelerate configuration file logged in.")
+        
+        # Log accelerate config file if it exists
+        try:
+            if 'ACCELERATE_CONFIG_FILE' in os.environ and os.path.exists(os.environ['ACCELERATE_CONFIG_FILE']):
+                mlflow.log_artifact(os.environ['ACCELERATE_CONFIG_FILE'], artifact_path="accelerate_config")
+                logging.info("Accelerate configuration file logged in.")
+            else:
+                logging.warning("Accelerate configuration file not found, skipping artifact logging.")
+        except Exception as e:
+            logging.warning(f"Could not log accelerate config file: {str(e)}")
+            
+        # Log the model
         ImageGenerationModel.log_model(
             finetuned_model_path=finetuned_model_path,
             model_no_finetuning_path=model_no_finetuning_path,
@@ -501,3 +535,40 @@ def deploy_model(demo_folder=None, finetuned_model_path=None, model_no_finetunin
             name="ImageGenerationService"
         )
         logging.info("Registered model: %s", registered_model.name)
+        
+        return registered_model
+
+if __name__ == "__main__":
+    # This script is primarily meant to be imported by notebooks for deployment
+    # But we provide a direct execution option for debugging purposes
+    import argparse
+    import traceback
+
+    parser = argparse.ArgumentParser(description='Deploy image generation model to MLflow')
+    parser.add_argument('--demo-folder', type=str, default="../../demo", help='Path to demo folder')
+    parser.add_argument('--finetuned-model', type=str, default="./dreambooth", help='Path to finetuned model')
+    parser.add_argument('--base-model', type=str, default="../../../local/stable-diffusion-2-1", help='Path to base model')
+    
+    args = parser.parse_args()
+    
+    print("This script is primarily intended to be imported by notebooks.")
+    print("Running deploy_model with default paths for debugging purposes...")
+    
+    try:
+        print(f"Demo folder: {args.demo_folder}")
+        print(f"Finetuned model: {args.finetuned_model}")
+        print(f"Base model: {args.base_model}")
+        
+        # Call the deploy_model function with provided paths
+        deploy_model(
+            demo_folder=args.demo_folder,
+            finetuned_model_path=args.finetuned_model,
+            model_no_finetuning_path=args.base_model
+        )
+    except Exception as e:
+        print(f"ERROR: Failed to deploy model: {e}")
+        print(f"Exception type: {type(e).__name__}")
+        print(f"Traceback: {traceback.format_exc()}")
+        # Exit with error code but don't crash immediately
+        import sys
+        sys.exit(1)
