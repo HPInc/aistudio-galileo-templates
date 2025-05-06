@@ -19,9 +19,6 @@ HF_SUBLAYER_TO_GGML = {
     "mlp.up_proj": "feed_forward.w3",
     "input_layernorm": "attention_norm",
     "post_attention_layernorm": "ffn_norm",
-    # "norm": "norm",
-    # "embed_tokens": "tok_embeddings",
-    # "lm_head": "output",
 }
 
 
@@ -102,8 +99,6 @@ if params["bias"] is not None and params["bias"] != "none":
     print("Error: param bias is not supported")
     sys.exit(1)
 
-# TODO: these seem to be layers that have been trained but without lora.
-# doesn't seem widely used but eventually should be supported
 if params["modules_to_save"] is not None and len(params["modules_to_save"]) > 0:
     print("Error: param modules_to_save is not supported")
     sys.exit(1)

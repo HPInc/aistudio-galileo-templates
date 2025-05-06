@@ -370,7 +370,7 @@ class GGMLQuantizedTensor(Tensor):
 
     def __init__(self, ndarray: NDArray, shape: List[int], data_type: DataType) -> None:
         rows, columns = shape
-        assert data_type in (DT_Q4_1, DT_Q4_0)  # for now
+        assert data_type in (DT_Q4_1, DT_Q4_0)  
         assert isinstance(data_type, QuantizedDataType)  # redundant, but mypy complains without this
         assert columns % data_type.groupsize == 0
         words_in_block = 6 if data_type == DT_Q4_1 else 5
