@@ -150,6 +150,7 @@ def register_llm_comparison_model(
             python_model=LLMComparisonModel(),
             artifacts=artifacts,
             signature=signature,
+            code_paths=["../../core"],
             pip_requirements=["torch", "transformers", "mlflow", "pandas"]
         )
 
