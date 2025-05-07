@@ -14,6 +14,8 @@ from mlflow.pyfunc import PythonModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema import StrOutputParser
 
+from src.mlflow_server_config import configure_mlflow_server
+
 # Add basic logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -230,6 +232,9 @@ class BaseGenerativeService(PythonModel):
             context: MLflow model context
         """
         try:
+            # Configure MLflow server with extended timeout (10 minutes)
+            configure_mlflow_server(timeout_seconds=600)
+            
             # Load configuration
             self.load_config(context)
             
