@@ -110,7 +110,7 @@ def initialize_llm(
             raise ValueError("HuggingFace API key is required for cloud model access")
             
         huggingfacehub_api_token = secrets["HUGGINGFACE_API_KEY"]
-        repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
+        repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
         return HuggingFaceEndpoint(
             huggingfacehub_api_token=huggingfacehub_api_token,
             repo_id=repo_id,
