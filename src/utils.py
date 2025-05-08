@@ -127,7 +127,7 @@ def initialize_llm(
         callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
         return LlamaCpp(
             model_path=local_model_path,
-            n_gpu_layers=30,
+            n_gpu_layers=-1,
             n_batch=512,
             n_ctx=4096,
             max_tokens=1024,
