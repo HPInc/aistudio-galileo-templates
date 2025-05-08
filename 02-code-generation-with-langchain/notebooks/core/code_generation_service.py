@@ -42,45 +42,6 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection_name = "my_collection"
         self.embedding_path = None
     
-    def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
-        """
-        Custom retriever function
-        
-        Args:
-            query: The query string for retrieval
-            top_n: Number of documents to retrieve
-            
-        Returns:
-            List of Document objects with content and metadata
-        """
-        if not self.collection:
-            logger.error("No collection available for retrieval")
-            return []
-            
-        try:
-            logger.info(f"Retrieving documents for query: {query[:30]}... (top {top_n})")
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=top_n
-            )
-            
-            documents = [
-                Document(
-                    page_content=str(results['documents'][i]),
-                    metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]
-                )
-                for i in range(len(results['documents']))
-            ]
-            
-            logger.info(f"Retrieved {len(documents)} documents")
-            return documents
-        except Exception as e:
-            logger.error(f"Error retrieving documents: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return []
-    
     def load_vector_store(self, persist_directory="./chroma_db"):
         """
         Load or create a vector store for code retrieval.
@@ -286,20 +247,11 @@ Question: {question}
                 raise ValueError("A retrieval mechanism must be initialized before creating the chain")
                 
             logger.info("Creating code generation chain")
-            # Create the chain using the custom_retriever function if collection is available,
-            # otherwise fall back to the standard retriever
-            if self.collection:
-                logger.info("Using direct collection querying for retrieval")
-                self.chain = {
-                    "context": lambda inputs: self.format_docs(self.custom_retriever(inputs["query"])),
-                    "question": RunnablePassthrough()
-                } | self.prompt | self.llm | StrOutputParser()
-            else:
-                logger.info("Using LangChain retriever fallback")
-                self.chain = {
-                    "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["query"])),
-                    "question": RunnablePassthrough()
-                } | self.prompt | self.llm | StrOutputParser()
+            logger.info("Using LangChain retriever")
+            self.chain = {
+                "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["query"])),
+                "question": RunnablePassthrough()
+            } | self.prompt | self.llm | StrOutputParser()
             logger.info("Code generation chain created successfully")
         except Exception as e:
             logger.error(f"Error creating code generation chain: {str(e)}")
@@ -361,8 +313,8 @@ Question: {question}
             return pd.DataFrame([{"result": "Error: No query provided for code generation retrieval."}])
             
         if not question:
-            logger.warning("No question provided for code generation prompt")
-            return pd.DataFrame([{"result": "Error: No question provided for code generation prompt."}])
+            logger.warning("No question provided for code generation")
+            return pd.DataFrame([{"result": "Error: No question provided for code generation."}])
         
         try:
             logger.info(f"Processing code generation request with query: {str(query)[:30]}... and question: {str(question)[:50]}...")
