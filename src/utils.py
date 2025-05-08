@@ -23,21 +23,6 @@ def configure_hf_cache(cache_dir: str = "/home/jovyan/local/hugging_face") -> No
     os.environ["HF_HUB_CACHE"] = os.path.join(cache_dir, "hub")
 
 
-def configure_mlflow_server_timeout(timeout_seconds: int = 600) -> None:
-    """
-    Configure MLflow server timeout for gunicorn workers.
-    
-    This is useful for models that take a long time to load, especially larger models.
-    The default timeout in MLflow is 270 seconds (4.5 minutes), which may not be enough
-    for loading large models.
-    
-    Args:
-        timeout_seconds: Timeout in seconds. Default is 600 (10 minutes).
-    """
-    os.environ["GUNICORN_CMD_ARGS"] = f"--timeout={timeout_seconds}"
-    print(f"MLflow server timeout set to {timeout_seconds} seconds")
-
-
 def load_config_and_secrets(
     config_path: str = "../../configs/config.yaml",
     secrets_path: str = "../../configs/secrets.yaml"
