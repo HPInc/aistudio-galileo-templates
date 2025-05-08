@@ -321,6 +321,8 @@ Question: {question}
         Returns:
             Dictionary with the generated code in a "result" field
         """
+        logger.info(f"Received model_input: {str(model_input)[:200]}...")
+        
         # Handle MLFlow API format where input is in {"inputs": {...}} format
         if "inputs" in model_input:
             # Extract from the inputs wrapper
@@ -374,11 +376,40 @@ Question: {question}
                 except Exception as count_error:
                     logger.warning(f"Could not get collection count: {str(count_error)}")
             
-            # Run the protected chain with monitoring, passing both query and question
-            result = self.protected_chain.invoke(
-                {"query": query, "question": question}, 
-                config={"callbacks": [self.prompt_handler]}
-            )
+            # Create the input dictionary for the chain
+            chain_input = {"query": query, "question": question}
+            logger.info(f"Passing to chain: {chain_input}")
+            
+            # When using Galileo Protect, wrap the input in a custom format expected by Pydantic
+            if self.protect_tool is not None:
+                try:
+                    # First try with the original format (already wrapped as required by Galileo)
+                    result = self.protected_chain.invoke(
+                        {"input": chain_input, "output": ""}, 
+                        config={"callbacks": [self.prompt_handler]}
+                    )
+                except Exception as protect_error:
+                    logger.warning(f"Error with protected chain using input/output format: {str(protect_error)}")
+                    # Try additional wrapper format for Pydantic validation
+                    try:
+                        # Try with a different format as a fallback
+                        result = self.protected_chain.invoke(
+                            {"input": {"input": chain_input}, "output": {"output": ""}}, 
+                            config={"callbacks": [self.prompt_handler]}
+                        )
+                    except Exception as nested_error:
+                        logger.error(f"Both protection formats failed. Falling back to direct chain. Error: {str(nested_error)}")
+                        # Fallback to direct chain if all else fails
+                        result = self.chain.invoke(
+                            chain_input,
+                            config={"callbacks": [self.prompt_handler]}
+                        )
+            else:
+                # Run the regular chain without Galileo Protect
+                result = self.chain.invoke(
+                    chain_input,
+                    config={"callbacks": [self.prompt_handler]}
+                )
             logger.info("Code generation processed successfully")
             
             # Clean up the result (remove markdown code blocks if present)
