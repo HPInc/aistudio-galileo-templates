@@ -40,6 +40,7 @@ class CodeGenerationService(BaseGenerativeService):
         self.retriever = None
         self.collection = None
         self.collection_name = "my_collection"
+        self.embedding_path = None
     
     def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
         """
@@ -90,14 +91,35 @@ class CodeGenerationService(BaseGenerativeService):
         try:
             logger.info(f"Loading vector store from {persist_directory}")
             
-            # Initialize embedding function
-            from langchain.embeddings import HuggingFaceEmbeddings
+            # Check if embedding model was provided as an artifact
+            embedding_path = getattr(self, 'embedding_path', None)
             
-            logger.info("Initializing embedding model")
-            embedding_function = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            )
-            logger.info("Embedding model loaded successfully.")
+            if embedding_path and os.path.exists(embedding_path):
+                logger.info(f"Loading embedding model from local path: {embedding_path}")
+                
+                # Import here to avoid issues with imports in different environments
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                
+                # Load the model from the saved directory
+                embedding_function = HuggingFaceEmbeddings(model_name=embedding_path)
+                logger.info("Embedding model loaded successfully from local path.")
+            else:
+                # If no local path is available, initialize from Hugging Face hub
+                logger.info("No local embedding model path found. Downloading from Hugging Face hub...")
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                
+                embedding_function = HuggingFaceEmbeddings(
+                    model_name="all-MiniLM-L6-v2"
+                )
+                logger.info("Embedding model downloaded and initialized from Hugging Face hub.")
             
             # Initialize chromadb client
             client = chromadb.PersistentClient(path=persist_directory)
@@ -125,7 +147,13 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
             # Create an empty vector store if loading fails
-            from langchain.embeddings import HuggingFaceEmbeddings
+            try:
+                from langchain_huggingface import HuggingFaceEmbeddings
+            except ImportError:
+                # Fall back to older import path
+                from langchain.embeddings import HuggingFaceEmbeddings
+            
+            # Fallback to a different model if the main one fails
             embedding_function = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-mpnet-base-v2"
             )
@@ -366,14 +394,15 @@ Question: {question}
             return pd.DataFrame([{"result": error_message}])
     
     @classmethod
-    def log_model(cls, secrets_path, config_path, model_path=None):
+    def log_model(cls, secrets_path, config_path, model_path=None, embedding_model_path=None):
         """
         Log the model to MLflow.
         
         Args:
             secrets_path: Path to the secrets file
             config_path: Path to the configuration file
-            model_path: Path to the model file (optional)
+            model_path: Path to the LLM model file (optional)
+            embedding_model_path: Path to the locally saved embedding model directory (optional)
             
         Returns:
             None
@@ -381,6 +410,10 @@ Question: {question}
         import mlflow
         from mlflow.models.signature import ModelSignature
         from mlflow.types.schema import Schema, ColSpec
+        import logging
+        import os
+        
+        logger = logging.getLogger(__name__)
         
         # Define model input/output schema
         input_schema = Schema([
@@ -400,6 +433,14 @@ Question: {question}
         
         if model_path:
             artifacts["models"] = model_path
+            
+        # Add embedding model to artifacts if path is provided
+        if embedding_model_path and os.path.exists(embedding_model_path):
+            artifacts["embedding_model"] = embedding_model_path
+            logger.info(f"Using local embedding model from: {embedding_model_path}")
+        else:
+            logger.warning("No local embedding model path provided or path doesn't exist. "
+                         "The service will download the model during initialization.")
         
         # Log model to MLflow
         mlflow.pyfunc.log_model(
@@ -423,3 +464,20 @@ Question: {question}
             ]
         )
         logger.info("Model and artifacts successfully registered in MLflow.")
+    
+    def load_context(self, context) -> None:
+        """
+        Load context for the model, including configuration, model, and chains.
+        This is an override of the BaseGenerativeService's load_context method to include
+        loading the embedding model from artifacts if available.
+        
+        Args:
+            context: MLflow model context
+        """
+        # Get the embedding model path from artifacts if available
+        if "embedding_model" in context.artifacts:
+            self.embedding_path = context.artifacts["embedding_model"]
+            logger.info(f"Found embedding model artifact at {self.embedding_path}")
+        
+        # Call the parent load_context method to handle the rest of the initialization
+        super().load_context(context)

@@ -21,6 +21,7 @@ def configure_hf_cache(cache_dir: str = "/home/jovyan/local/hugging_face") -> No
     """
     os.environ["HF_HOME"] = cache_dir
     os.environ["HF_HUB_CACHE"] = os.path.join(cache_dir, "hub")
+    os.environ["TRANSFORMERS_CACHE"] = os.path.join(cache_dir, "transformers")
 
 
 def load_config_and_secrets(
