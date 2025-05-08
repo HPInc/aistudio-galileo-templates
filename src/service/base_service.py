@@ -4,6 +4,7 @@ This module provides the core functionality for all service classes,
 including model loading, configuration, and integration with Galileo services.
 """
 
+import datetime
 import os
 import yaml
 import sys
@@ -135,7 +136,8 @@ class BaseGenerativeService(PythonModel):
             project = gp.create_project(self.model_config["protect_project"])
             project_id = project.id
             
-            stage_name = f"{self.model_config['protect_project']}_stage"
+            timestamp = datetime.datetime.now()
+            stage_name = f"{self.model_config['protect_project']}_stage" + timestamp.strftime('%Y-%m-%d %H:%M:%S')
             stage = gp.create_stage(name=stage_name, project_id=project_id)
             stage_id = stage.id
             

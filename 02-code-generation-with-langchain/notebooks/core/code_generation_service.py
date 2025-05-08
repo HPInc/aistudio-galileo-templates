@@ -17,6 +17,7 @@ from langchain.vectorstores import Chroma
 from langchain.schema import Document
 from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
+import chromadb
 
 # Import base service class from the shared location
 import sys
@@ -37,6 +38,48 @@ class CodeGenerationService(BaseGenerativeService):
         super().__init__()
         self.vector_store = None
         self.retriever = None
+        self.collection = None
+        self.collection_name = "my_collection"
+        self.embedding_path = None
+    
+    def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
+        """
+        Custom retriever function
+        
+        Args:
+            query: The query string for retrieval
+            top_n: Number of documents to retrieve
+            
+        Returns:
+            List of Document objects with content and metadata
+        """
+        if not self.collection:
+            logger.error("No collection available for retrieval")
+            return []
+            
+        try:
+            logger.info(f"Retrieving documents for query: {query[:30]}... (top {top_n})")
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=top_n
+            )
+            
+            documents = [
+                Document(
+                    page_content=str(results['documents'][i]),
+                    metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]
+                )
+                for i in range(len(results['documents']))
+            ]
+            
+            logger.info(f"Retrieved {len(documents)} documents")
+            return documents
+        except Exception as e:
+            logger.error(f"Error retrieving documents: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return []
     
     def load_vector_store(self, persist_directory="./chroma_db"):
         """
@@ -48,19 +91,54 @@ class CodeGenerationService(BaseGenerativeService):
         try:
             logger.info(f"Loading vector store from {persist_directory}")
             
-            # Initialize embedding function
-            from langchain.embeddings import HuggingFaceEmbeddings
+            # Check if embedding model was provided as an artifact
+            embedding_path = getattr(self, 'embedding_path', None)
             
-            logger.info("Initializing embedding model")
-            embedding_function = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-mpnet-base-v2"
-            )
-            logger.info("Embedding model loaded successfully.")
+            if embedding_path and os.path.exists(embedding_path):
+                logger.info(f"Loading embedding model from local path: {embedding_path}")
+                
+                # Import here to avoid issues with imports in different environments
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                
+                # Load the model from the saved directory
+                embedding_function = HuggingFaceEmbeddings(model_name=embedding_path)
+                logger.info("Embedding model loaded successfully from local path.")
+            else:
+                # If no local path is available, initialize from Hugging Face hub
+                logger.info("No local embedding model path found. Downloading from Hugging Face hub...")
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                
+                embedding_function = HuggingFaceEmbeddings(
+                    model_name="all-MiniLM-L6-v2"
+                )
+                logger.info("Embedding model downloaded and initialized from Hugging Face hub.")
             
-            # Try to load existing vector store with the embedding function
+            # Initialize chromadb client
+            client = chromadb.PersistentClient(path=persist_directory)
+            
+            # Try to get existing collection or create a new one
+            try:
+                logger.info(f"Trying to get collection: {self.collection_name}")
+                self.collection = client.get_collection(name=self.collection_name)
+                logger.info(f"Collection '{self.collection_name}' found")
+            except Exception as col_err:
+                logger.info(f"Collection not found, creating new one: {str(col_err)}")
+                self.collection = client.create_collection(name=self.collection_name)
+                logger.info(f"Created new collection: {self.collection_name}")
+            
+            # Initialize LangChain vector store with the embedding function
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=embedding_function
+                embedding_function=embedding_function,
+                collection_name=self.collection_name
             )
             self.retriever = self.vector_store.as_retriever()
             logger.info(f"Vector store successfully loaded from {persist_directory}")
@@ -69,7 +147,13 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
             # Create an empty vector store if loading fails
-            from langchain.embeddings import HuggingFaceEmbeddings
+            try:
+                from langchain_huggingface import HuggingFaceEmbeddings
+            except ImportError:
+                # Fall back to older import path
+                from langchain.embeddings import HuggingFaceEmbeddings
+            
+            # Fallback to a different model if the main one fails
             embedding_function = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-mpnet-base-v2"
             )
@@ -173,7 +257,7 @@ Your answer should consist of just the Python code, without any additional text 
 Context:
 {context}
 
-Question: {query}
+Question: {question}
 """
         self.prompt = ChatPromptTemplate.from_template(self.prompt_str)
     
@@ -196,16 +280,26 @@ Question: {query}
             logger.info("Loading vector store for retrieval")
             self.load_vector_store()
             
-            if not self.retriever:
-                logger.error("Retriever is not initialized")
-                raise ValueError("Retriever must be initialized before creating the chain")
+            # Verify retriever readiness using either direct collection or fallback to LangChain retriever
+            if not self.collection and not self.retriever:
+                logger.error("Neither collection nor retriever is initialized")
+                raise ValueError("A retrieval mechanism must be initialized before creating the chain")
                 
             logger.info("Creating code generation chain")
-            # Create the chain
-            self.chain = {
-                "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["question"])),
-                "query": RunnablePassthrough()
-            } | self.prompt | self.llm | StrOutputParser()
+            # Create the chain using the custom_retriever function if collection is available,
+            # otherwise fall back to the standard retriever
+            if self.collection:
+                logger.info("Using direct collection querying for retrieval")
+                self.chain = {
+                    "context": lambda inputs: self.format_docs(self.custom_retriever(inputs["query"])),
+                    "question": RunnablePassthrough()
+                } | self.prompt | self.llm | StrOutputParser()
+            else:
+                logger.info("Using LangChain retriever fallback")
+                self.chain = {
+                    "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["query"])),
+                    "question": RunnablePassthrough()
+                } | self.prompt | self.llm | StrOutputParser()
             logger.info("Code generation chain created successfully")
         except Exception as e:
             logger.error(f"Error creating code generation chain: {str(e)}")
@@ -220,32 +314,102 @@ Question: {query}
         
         Args:
             context: MLflow model context
-            model_input: Input data for code generation, expecting a "question" field
+            model_input: Input data for code generation, expecting either:
+                         - A direct dict with "question" field
+                         - A dict with "inputs" containing "question" or "query" fields
             
         Returns:
             Dictionary with the generated code in a "result" field
         """
-        # Handle question input whether it's a pandas Series or a string
-        if "question" in model_input:
-            # If it's a pandas Series, extract the first value
-            if hasattr(model_input["question"], "iloc"):
-                question = model_input["question"].iloc[0] if not model_input["question"].empty else ""
-            else:
-                question = model_input["question"]
-        else:
-            question = ""
+        logger.info(f"Received model_input: {str(model_input)[:200]}...")
         
+        # Handle MLFlow API format where input is in {"inputs": {...}} format
+        if "inputs" in model_input:
+            # Extract from the inputs wrapper
+            input_data = model_input["inputs"]
+        else:
+            # Direct input format
+            input_data = model_input
+            
+        # Extract both query and question fields
+        query = ""
+        question = ""
+        
+        # Handle query field (used for retrieval)
+        if "query" in input_data:
+            if hasattr(input_data["query"], "iloc"):
+                query = input_data["query"].iloc[0] if not input_data["query"].empty else ""
+            else:
+                # Handle when it's a list (from API format) or a direct string
+                if isinstance(input_data["query"], list) and len(input_data["query"]) > 0:
+                    query = input_data["query"][0]
+                else:
+                    query = input_data["query"]
+        
+        # Handle question field (used for code generation prompt)
+        if "question" in input_data:
+            if hasattr(input_data["question"], "iloc"):
+                question = input_data["question"].iloc[0] if not input_data["question"].empty else ""
+            else:
+                # Handle when it's a list (from API format) or a direct string
+                if isinstance(input_data["question"], list) and len(input_data["question"]) > 0:
+                    question = input_data["question"][0]
+                else:
+                    question = input_data["question"]
+        
+        # Check if both fields are provided
+        if not query:
+            logger.warning("No query provided for code generation retrieval")
+            return pd.DataFrame([{"result": "Error: No query provided for code generation retrieval."}])
+            
         if not question:
-            logger.warning("No question provided for code generation")
-            return pd.DataFrame([{"result": "Error: No question provided for code generation."}])
+            logger.warning("No question provided for code generation prompt")
+            return pd.DataFrame([{"result": "Error: No question provided for code generation prompt."}])
         
         try:
-            logger.info(f"Processing code generation request: {str(question)[:50]}...")
-            # Run the protected chain with monitoring
-            result = self.protected_chain.invoke(
-                {"question": question}, 
-                config={"callbacks": [self.prompt_handler]}
-            )
+            logger.info(f"Processing code generation request with query: {str(query)[:30]}... and question: {str(question)[:50]}...")
+            # Log some info about the collection state
+            if self.collection:
+                try:
+                    count = self.collection.count()
+                    logger.info(f"Collection '{self.collection_name}' has {count} documents")
+                except Exception as count_error:
+                    logger.warning(f"Could not get collection count: {str(count_error)}")
+            
+            # Create the input dictionary for the chain
+            chain_input = {"query": query, "question": question}
+            logger.info(f"Passing to chain: {chain_input}")
+            
+            # When using Galileo Protect, wrap the input in a custom format expected by Pydantic
+            if self.protect_tool is not None:
+                try:
+                    # First try with the original format (already wrapped as required by Galileo)
+                    result = self.protected_chain.invoke(
+                        {"input": chain_input, "output": ""}, 
+                        config={"callbacks": [self.prompt_handler]}
+                    )
+                except Exception as protect_error:
+                    logger.warning(f"Error with protected chain using input/output format: {str(protect_error)}")
+                    # Try additional wrapper format for Pydantic validation
+                    try:
+                        # Try with a different format as a fallback
+                        result = self.protected_chain.invoke(
+                            {"input": {"input": chain_input}, "output": {"output": ""}}, 
+                            config={"callbacks": [self.prompt_handler]}
+                        )
+                    except Exception as nested_error:
+                        logger.error(f"Both protection formats failed. Falling back to direct chain. Error: {str(nested_error)}")
+                        # Fallback to direct chain if all else fails
+                        result = self.chain.invoke(
+                            chain_input,
+                            config={"callbacks": [self.prompt_handler]}
+                        )
+            else:
+                # Run the regular chain without Galileo Protect
+                result = self.chain.invoke(
+                    chain_input,
+                    config={"callbacks": [self.prompt_handler]}
+                )
             logger.info("Code generation processed successfully")
             
             # Clean up the result (remove markdown code blocks if present)
@@ -261,14 +425,15 @@ Question: {query}
             return pd.DataFrame([{"result": error_message}])
     
     @classmethod
-    def log_model(cls, secrets_path, config_path, model_path=None):
+    def log_model(cls, secrets_path, config_path, model_path=None, embedding_model_path=None):
         """
         Log the model to MLflow.
         
         Args:
             secrets_path: Path to the secrets file
             config_path: Path to the configuration file
-            model_path: Path to the model file (optional)
+            model_path: Path to the LLM model file (optional)
+            embedding_model_path: Path to the locally saved embedding model directory (optional)
             
         Returns:
             None
@@ -276,6 +441,10 @@ Question: {query}
         import mlflow
         from mlflow.models.signature import ModelSignature
         from mlflow.types.schema import Schema, ColSpec
+        import logging
+        import os
+        
+        logger = logging.getLogger(__name__)
         
         # Define model input/output schema
         input_schema = Schema([
@@ -283,7 +452,7 @@ Question: {query}
             ColSpec("string", "question")
         ])
         output_schema = Schema([
-            ColSpec("string", "generated_code")
+            ColSpec("string", "result")
         ])
         signature = ModelSignature(inputs=input_schema, outputs=output_schema)
         
@@ -295,6 +464,14 @@ Question: {query}
         
         if model_path:
             artifacts["models"] = model_path
+            
+        # Add embedding model to artifacts if path is provided
+        if embedding_model_path and os.path.exists(embedding_model_path):
+            artifacts["embedding_model"] = embedding_model_path
+            logger.info(f"Using local embedding model from: {embedding_model_path}")
+        else:
+            logger.warning("No local embedding model path provided or path doesn't exist. "
+                         "The service will download the model during initialization.")
         
         # Log model to MLflow
         mlflow.pyfunc.log_model(
@@ -312,7 +489,26 @@ Question: {query}
                 "chromadb",
                 "langchain_core",
                 "langchain_huggingface",
+                "langchain_community",
+                "sentence-transformers",
                 "pyyaml"
             ]
         )
         logger.info("Model and artifacts successfully registered in MLflow.")
+    
+    def load_context(self, context) -> None:
+        """
+        Load context for the model, including configuration, model, and chains.
+        This is an override of the BaseGenerativeService's load_context method to include
+        loading the embedding model from artifacts if available.
+        
+        Args:
+            context: MLflow model context
+        """
+        # Get the embedding model path from artifacts if available
+        if "embedding_model" in context.artifacts:
+            self.embedding_path = context.artifacts["embedding_model"]
+            logger.info(f"Found embedding model artifact at {self.embedding_path}")
+        
+        # Call the parent load_context method to handle the rest of the initialization
+        super().load_context(context)
