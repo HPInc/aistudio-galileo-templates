@@ -1,22 +1,22 @@
-# Vanilla RAG with LangChain and Galileo
+# 🤖 Vanilla RAG with LangChain and Galileo
 
-## 📚 Contents
+# 📚 Contents
 
-- Overview
-- Project Structure
-- Setup
-- Usage
-- Contact & Support
-
----
-
-## 🧠 Overview
-
-This project is an AI-powered vanilla **RAG (Retrieval-Augmented Generation)** chatbot built using **LangChain** and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate contextual and document-grounded answers to user queries.
+- [🧠 Overview](#overview)
+- [🗂 Project Structure](#project-structure)
+- [⚙️ Setup](#setup)
+- [🚀 Usage](#usage)
+- [📞 Contact and Support](#contact-and-support)
 
 ---
 
-## 🗂 Project Structure
+# Overview
+
+This project is an AI-powered vanilla **RAG (Retrieval-Augmented Generation)** chatbot built using **LangChain** and **Galileo** for model evaluation, protection, and observability. It leverages the **Z by HP AI Studio Local GenAI image** and the **LLaMA2-7B** model to generate contextual and document-grounded answers to user queries about **Z by HP AI Studio**.
+
+---
+
+#  Project Structure
 
 ```
 ├── core
@@ -39,12 +39,12 @@ This project is an AI-powered vanilla **RAG (Retrieval-Augmented Generation)** c
 
 ---
 
-## ⚙️ Setup
+# Setup
 
 ### Step 0: Minimum Hardware Requirements
 To ensure smooth execution and reliable model deployment, make sure your system meets the following minimum hardware specifications:
 
-- RAM: 64 GB 
+- RAM: 32 GB 
 - VRAM: 12 GB 
 - GPU: NVIDIA GPU 
 
@@ -82,7 +82,7 @@ https://github.com/HPInc/aistudio-galileo-templates.git
 
 ---
 
-## 🚀 Usage
+# Usage
 
 ### Step 1: Run the Notebook
 
@@ -113,12 +113,12 @@ This will:
 
 ---
 
-## 📞 Contact & Support
+# Contact and Support
 
 - 💬 For issues or questions, please [open a GitHub issue](https://github.com/HPInc/aistudio-galileo-templates/issues).
 - 📘 Refer to the official [AI Studio Documentation](https://zdocs.datascience.hp.com/docs/aistudio/overview) for detailed instructions and troubleshooting tips.
 
 ---
 
-> Built with ❤️ using Z by HP AI Studio.
+> Built with ❤️ using [**Z by HP AI Studio**](https://zdocs.datascience.hp.com/docs/aistudio/overview).
 
