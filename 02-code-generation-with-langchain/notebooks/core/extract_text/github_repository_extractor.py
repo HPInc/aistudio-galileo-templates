@@ -1,17 +1,36 @@
+"""
+GitHub Repository Extractor
+
+Key Features:
+- File size limits to prevent processing of large files that would exceed context windows
+- Pattern-based filtering to exclude minified/bundled JavaScript and CSS files
+- Intelligent code chunking for large files to stay within token limits
+- Preserved context information with file path and line number references
+
+Usage:
+    extractor = GitHubRepositoryExtractor(
+        repo_url="https://github.com/username/repo",
+        max_file_size_kb=500,  # Limit files to 500KB
+        max_chunk_size=100     # Break files into 100-line chunks
+    )
+    data = extractor.run()
+
+"""
+
 import os
 import re
 import requests
 import shutil
 import uuid
 import logging
-from typing import List, Dict, Any, Optional
 import nbformat
 from urllib.parse import urlparse
+from typing import List, Dict, Any, Optional, Set, Tuple
 
 class GitHubRepositoryExtractor:
     """
-    Extracts code and documentation from GitHub repositories.
-    Works with multiple file types including Python files and Jupyter notebooks.
+    Extractor for code and documentation from GitHub repositories.
+    Works with multiple file types
     
     Attributes:
         repo_url (str): GitHub repository URL
@@ -19,12 +38,15 @@ class GitHubRepositoryExtractor:
         repo_name (str): GitHub repository name
         save_dir (str): Local directory to save downloaded files
         verbose (bool): If True, enables logging output
-        api_base_url (str): Base URL for GitHub API requests
+        max_file_size_kb (int): Maximum file size in KB to process
+        max_chunk_size (int): Maximum size of code chunks (in lines)
         supported_extensions (tuple): File extensions this class will process
+        excluded_patterns (set): Regex patterns for files to exclude
     """
     
     def __init__(self, repo_url: str, save_dir: str = './repo_files', verbose: bool = False,
-                 supported_extensions: tuple = ('.py', '.ipynb', '.js', '.ts', '.java', '.c', '.cpp', '.h', '.md')):
+                 max_file_size_kb: int = 500, max_chunk_size: int = 100,
+                 supported_extensions: tuple = ('.py', '.ipynb', '.md', '.txt', '.json')):
         """
         Initializes the GitHub repository extractor.
         
@@ -32,6 +54,8 @@ class GitHubRepositoryExtractor:
             repo_url (str): URL to the GitHub repository
             save_dir (str): Directory to save downloaded files
             verbose (bool): Whether to enable verbose logging
+            max_file_size_kb (int): Maximum file size in KB to process
+            max_chunk_size (int): Maximum size of code chunks in lines
             supported_extensions (tuple): File extensions to process
         """
         # Parse repository URL to extract owner and name
@@ -41,8 +65,20 @@ class GitHubRepositoryExtractor:
         self.repo_name = parsed_url["repo"]
         self.save_dir = save_dir
         self.verbose = verbose
+        self.max_file_size_kb = max_file_size_kb
+        self.max_chunk_size = max_chunk_size
         self.supported_extensions = supported_extensions
         self.api_base_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/contents"
+        
+        # Define patterns for files to exclude (minified/bundled files that can exceed context)
+        self.excluded_patterns = {
+            r'\.min\.(js|css)$',  # Minified JS/CSS
+            r'-[a-zA-Z0-9]{8}\.(js|css)$',  # Bundled files with hash
+            r'bundle\.(js|css)$',  # Generic bundles
+            r'vendor\.(js|css)$',  # Vendor bundles
+            r'dist/assets/.*\.(js|css)$',  # Dist assets
+            r'node_modules/.*',  # Node modules
+        }
         
         # Set up logging
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -113,6 +149,30 @@ class GitHubRepositoryExtractor:
         
         return extracted_data
     
+    def _should_skip_file(self, file_path: str, size: int) -> bool:
+        """
+        Determines whether a file should be skipped based on size and pattern.
+        
+        Args:
+            file_path (str): Path to the file
+            size (int): Size of the file in bytes
+            
+        Returns:
+            True if the file should be skipped, False otherwise
+        """
+        # Check file size
+        if size > self.max_file_size_kb * 1024:
+            self.logger.info(f"Skipping large file ({size/1024:.1f} KB): {file_path}")
+            return True
+            
+        # Check excluded patterns
+        for pattern in self.excluded_patterns:
+            if re.search(pattern, file_path):
+                self.logger.info(f"Skipping excluded file pattern: {file_path}")
+                return True
+                
+        return False
+    
     def _process_directory(self, api_url: str) -> List[Dict]:
         """
         Recursively processes a directory in the repository.
@@ -138,7 +198,12 @@ class GitHubRepositoryExtractor:
                 if item['type'] == 'file':
                     file_extension = os.path.splitext(item['name'])[1].lower()
                     
+                    # Only process files with supported extensions
                     if file_extension in self.supported_extensions:
+                        # Skip files that are too large or match excluded patterns
+                        if self._should_skip_file(item['path'], item['size']):
+                            continue
+                            
                         file_path = os.path.join(self.save_dir, item['path'])
                         
                         # Create directory structure if needed
@@ -222,14 +287,23 @@ class GitHubRepositoryExtractor:
                     context = ''.join(cell['source'])
                 
                 elif cell['cell_type'] == 'code' and cell['source'].strip():
-                    cell_data = {
-                        "id": str(uuid.uuid4()),
-                        "embedding": None,
-                        "code": ''.join(cell['source']),
-                        "filename": os.path.relpath(notebook_path, self.save_dir),
-                        "context": context
-                    }
-                    extracted_data.append(cell_data)
+                    # For large code cells, break into smaller chunks
+                    code_chunks = self._chunk_code(''.join(cell['source']), self.max_chunk_size)
+                    
+                    for i, chunk in enumerate(code_chunks):
+                        # Add chunk indicator if multiple chunks
+                        chunk_context = context
+                        if len(code_chunks) > 1:
+                            chunk_context += f" (Part {i+1} of {len(code_chunks)})"
+                            
+                        cell_data = {
+                            "id": str(uuid.uuid4()),
+                            "embedding": None,
+                            "code": chunk,
+                            "filename": os.path.relpath(notebook_path, self.save_dir),
+                            "context": chunk_context
+                        }
+                        extracted_data.append(cell_data)
             
             return extracted_data
         
@@ -251,8 +325,19 @@ class GitHubRepositoryExtractor:
             with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                 content = f.read()
             
-            # Split the file into chunks with reasonable size
-            chunks = self._split_code_into_chunks(content, file_path)
+            # For shorter files, process as a single chunk
+            if content.count('\n') <= self.max_chunk_size:
+                chunk_data = {
+                    "id": str(uuid.uuid4()),
+                    "embedding": None,
+                    "code": content,
+                    "filename": os.path.relpath(file_path, self.save_dir),
+                    "context": f"File: {os.path.basename(file_path)}"
+                }
+                return [chunk_data]
+            
+            # For longer files, use logical chunking with size limits
+            chunks = self._chunk_file_content(content, file_path)
             
             # Convert chunks to the expected output format
             extracted_data = []
@@ -263,7 +348,7 @@ class GitHubRepositoryExtractor:
                         "embedding": None,
                         "code": code,
                         "filename": os.path.relpath(file_path, self.save_dir),
-                        "context": doc_context
+                        "context": doc_context or f"File: {os.path.basename(file_path)} (Part {i+1} of {len(chunks)})"
                     }
                     extracted_data.append(chunk_data)
             
@@ -273,79 +358,56 @@ class GitHubRepositoryExtractor:
             self.logger.error(f"Error extracting from file {file_path}: {str(e)}")
             return []
     
-    def _split_code_into_chunks(self, content: str, file_path: str) -> List[tuple]:
+    def _chunk_code(self, code: str, max_lines: int) -> List[str]:
         """
-        Splits code files into logical chunks based on code structure and documentation.
+        Splits code into chunks of reasonable size.
+        
+        Args:
+            code (str): Code to split
+            max_lines (int): Maximum number of lines per chunk
+            
+        Returns:
+            List of code chunks
+        """
+        lines = code.split('\n')
+        
+        # If code is small enough, return as is
+        if len(lines) <= max_lines:
+            return [code]
+            
+        # Otherwise break into chunks
+        chunks = []
+        for i in range(0, len(lines), max_lines):
+            chunk_lines = lines[i:min(i+max_lines, len(lines))]
+            chunks.append('\n'.join(chunk_lines))
+            
+        return chunks
+    
+    def _chunk_file_content(self, content: str, file_path: str) -> List[Tuple[str, str]]:
+        """
+        Splits file content into logical chunks with size limits.
         
         Args:
             content (str): File content
-            file_path (str): Path to the file (for language detection)
+            file_path (str): Path to the file
             
         Returns:
-            List of (code, documentation_context) tuples
+            List of (code, context) tuples
         """
         file_extension = os.path.splitext(file_path)[1].lower()
-        
-        # Set comment patterns based on file extension
-        if file_extension in ('.py', '.ipynb'):
-            # For Python files
-            doc_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'|#.*$)'
-            function_pattern = r'(def\s+\w+\(.*?\):|class\s+\w+.*?:)'
-        elif file_extension in ('.js', '.ts'):
-            # For JavaScript/TypeScript files
-            doc_pattern = r'(\/\*[\s\S]*?\*\/|\/\/.*$)'
-            function_pattern = r'(function\s+\w+\s*\(.*?\)|class\s+\w+|const\s+\w+\s*=\s*function)'
-        elif file_extension in ('.java'):
-            # For Java files
-            doc_pattern = r'(\/\*[\s\S]*?\*\/|\/\/.*$)'
-            function_pattern = r'(public|private|protected)?\s*(static)?\s*\w+\s+\w+\s*\(.*?\)'
-        elif file_extension in ('.c', '.cpp', '.h'):
-            # For C/C++ files
-            doc_pattern = r'(\/\*[\s\S]*?\*\/|\/\/.*$)'
-            function_pattern = r'(\w+\s+\w+\s*\(.*?\))'
-        else:
-            # Generic pattern
-            doc_pattern = r'(\/\*[\s\S]*?\*\/|#.*$|\/\/.*$)'
-            function_pattern = r'(\w+\s+\w+\s*\(.*?\))'
-        
         lines = content.split('\n')
+        file_basename = os.path.basename(file_path)
+        
+        # For small files, just return the whole thing
+        if len(lines) <= self.max_chunk_size:
+            return [(content, f"File: {file_basename}")]
+        
+        # For large files, use simple chunking with line numbers as context
         chunks = []
-        
-        current_code = []
-        current_context = ''
-        last_doc = ''
-        
-        for i, line in enumerate(lines):
-            # Check if line contains documentation
-            doc_match = re.search(doc_pattern, line, re.MULTILINE)
-            if doc_match:
-                last_doc = doc_match.group(0)
-                if not current_context:
-                    current_context = last_doc
-            
-            # Check if line starts a new function or class
-            func_match = re.search(function_pattern, line)
-            if func_match and i > 0:
-                # If we were collecting code, save the chunk
-                if current_code:
-                    chunks.append(('\n'.join(current_code), current_context))
-                
-                # Start a new chunk
-                current_code = [line]
-                current_context = last_doc
-            else:
-                current_code.append(line)
-        
-        # Don't forget the last chunk
-        if current_code:
-            chunks.append(('\n'.join(current_code), current_context))
-        
-        # If we didn't find natural breakpoints, split the file into reasonable chunks
-        if len(chunks) <= 1 and len(lines) > 50:
-            chunks = []
-            chunk_size = 50
-            for i in range(0, len(lines), chunk_size):
-                chunk_lines = lines[i:min(i+chunk_size, len(lines))]
-                chunks.append(('\n'.join(chunk_lines), f"Code chunk from lines {i+1}-{min(i+chunk_size, len(lines))}"))
+        for i in range(0, len(lines), self.max_chunk_size):
+            end_line = min(i + self.max_chunk_size, len(lines))
+            chunk_content = '\n'.join(lines[i:end_line])
+            context = f"File: {file_basename}, Lines {i+1}-{end_line} of {len(lines)}"
+            chunks.append((chunk_content, context))
         
         return chunks

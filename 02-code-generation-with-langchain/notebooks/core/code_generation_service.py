@@ -84,7 +84,10 @@ class CodeGenerationService(BaseGenerativeService):
             extractor = GitHubRepositoryExtractor(
                 repo_url=repository_url,
                 save_dir=save_dir,
-                verbose=True
+                verbose=True,
+                max_file_size_kb=500,  # Skip files larger than 500KB
+                max_chunk_size=100,    # Break large files into chunks of 100 lines
+                supported_extensions=('.py', '.ipynb', '.js', '.ts', '.java', '.c', '.cpp', '.h', '.md', '.txt', '.json')
             )
             extracted_data = extractor.run()
             

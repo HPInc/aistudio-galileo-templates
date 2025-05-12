@@ -24,7 +24,7 @@ This notebook performs automatic code explanation by extracting code snippets fr
 │   ├── dataflow
 │   │   └── dataflow.py
 │   ├── extract_text
-│   │   └── github_notebook_extractor.py
+│   │   └── github_repository_extractor.py
 │   ├── generate_metadata
 │   │   └── llm_context_updater.py
 │   ├── vector_database
