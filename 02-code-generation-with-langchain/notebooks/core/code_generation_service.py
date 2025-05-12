@@ -427,7 +427,6 @@ Question: {question}
             logger.info("Loading vector store for retrieval")
             self.load_vector_store()
             
-            # We don't require the retriever to be ready immediately, as repository context will be loaded on demand
             logger.info("Creating code generation chain")
             
             # Create the chain with enhanced error handling for empty or missing collections
@@ -724,65 +723,3 @@ Question: {question}
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
     
-    def extract_github_repository(self, repo_url: str, branch: str = "main") -> str:
-        """
-        Extract code files from a GitHub repository and save them to a local directory.
-        
-        Args:
-            repo_url: URL of the GitHub repository (e.g., 'https://github.com/user/repo')
-            branch: Branch name to extract code from (default: 'main')
-        
-        Returns:
-            Path to the directory containing the extracted code files
-        """
-        try:
-            logger.info(f"Extracting GitHub repository: {repo_url} (branch: {branch})")
-            
-            # Generate a unique ID for this extraction task
-            task_id = str(uuid.uuid4())
-            temp_repo_dir = os.path.join(self.temp_dir, task_id)
-            
-            # Ensure the temp directory for this task exists
-            os.makedirs(temp_repo_dir, exist_ok=True)
-            
-            # Extract the repository using the GitHubRepositoryExtractor
-            extractor = GitHubRepositoryExtractor(repo_url, branch, temp_repo_dir)
-            file_mapping = extractor.extract()
-            
-            logger.info(f"Extracted files: {file_mapping}")
-            
-            return temp_repo_dir
-        except Exception as e:
-            logger.error(f"Error extracting GitHub repository: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise
-    
-    def update_context_with_repository(self, repo_path: str, question: str) -> str:
-        """
-        Update the code generation context with relevant code from the extracted repository.
-        
-        Args:
-            repo_path: Path to the directory containing the extracted code files
-            question: The question or prompt for code generation
-            
-        Returns:
-            Updated context string including relevant code snippets
-        """
-        try:
-            logger.info(f"Updating context with repository code: {repo_path}")
-            
-            # Use the LLMContextUpdater to analyze the repository and update the context
-            updater = LLMContextUpdater(repo_path, question)
-            updated_context = updater.update_context()
-            
-            logger.info("Context updated successfully")
-            
-            return updated_context
-        except Exception as e:
-            logger.error(f"Error updating context with repository: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise
