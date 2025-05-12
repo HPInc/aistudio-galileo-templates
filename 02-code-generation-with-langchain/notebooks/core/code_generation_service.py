@@ -3,6 +3,8 @@ Code Generation Service implementation that extends the BaseGenerativeService.
 
 This service provides code generation capabilities using LLM models with vector retrieval
 and integrates with Galileo for protection, observation, and evaluation.
+
+It supports extracting code context from GitHub repositories to improve code generation quality.
 """
 
 import os
@@ -18,6 +20,8 @@ from langchain.schema import Document
 from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
 import chromadb
+import uuid
+from urllib.parse import urlparse
 
 # Import base service class from the shared location
 import sys
@@ -27,11 +31,22 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
 
+# Import modules for GitHub repository extraction and processing
+from core.extract_text.github_repository_extractor import GitHubRepositoryExtractor
+from core.generate_metadata.llm_context_updater import LLMContextUpdater
+from core.dataflow.dataflow import EmbeddingUpdater, DataFrameConverter
+from core.vector_database.vector_store_writer import VectorStoreWriter
+
 # Set up logger
 logger = logging.getLogger(__name__)
 
 class CodeGenerationService(BaseGenerativeService):
-    """Code Generation Service that extends the BaseGenerativeService."""
+    """
+    Code Generation Service that extends the BaseGenerativeService.
+    
+    This service can extract code context from GitHub repositories and use it
+    to generate relevant code based on user questions.
+    """
 
     def __init__(self):
         """Initialize the code generation service."""
@@ -41,10 +56,139 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection = None
         self.collection_name = "my_collection"
         self.embedding_path = None
+        self.temp_dir = os.path.join(os.path.dirname(__file__), "temp_repositories")
+        
+        # Ensure temp directory exists
+        os.makedirs(self.temp_dir, exist_ok=True)
+    
+    def process_github_repository(self, repository_url: str) -> List[Dict]:
+        """
+        Process a GitHub repository and extract code snippets with context.
+        
+        Args:
+            repository_url: URL of the GitHub repository to process
+            
+        Returns:
+            List of extracted code snippets with context
+        """
+        try:
+            logger.info(f"Processing GitHub repository: {repository_url}")
+            
+            # Create a unique directory name for this repository
+            parsed_url = urlparse(repository_url)
+            path_parts = [p for p in parsed_url.path.split('/') if p]
+            repo_dir_name = f"{path_parts[0]}_{path_parts[1]}_{uuid.uuid4().hex[:8]}"
+            save_dir = os.path.join(self.temp_dir, repo_dir_name)
+            
+            # Extract repository content
+            extractor = GitHubRepositoryExtractor(
+                repo_url=repository_url,
+                save_dir=save_dir,
+                verbose=True
+            )
+            extracted_data = extractor.run()
+            
+            logger.info(f"Extracted {len(extracted_data)} code snippets from repository")
+            return extracted_data
+            
+        except Exception as e:
+            logger.error(f"Error processing GitHub repository: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return []
+    
+    def generate_code_context(self, repository_url: str) -> bool:
+        """
+        Generate code context from a GitHub repository and store it in the vector database.
+        
+        Args:
+            repository_url: URL of the GitHub repository
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Step 1: Extract code from repository
+            extracted_data = self.process_github_repository(repository_url)
+            if not extracted_data:
+                logger.error("No data extracted from repository")
+                return False
+                
+            # Step 2: Generate metadata with LLM if available
+            if self.llm:
+                # Define template for context generation
+                template = """
+                You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
+                
+                Code:
+                {code}
+                
+                File name:
+                {filename}
+                
+                Context:
+                {context}
+                
+                Describe what the code above does.
+                """
+                from langchain_core.prompts import PromptTemplate
+                prompt = PromptTemplate.from_template(template)
+                llm_chain = prompt | self.llm
+                
+                # Update context with LLM
+                updater = LLMContextUpdater(
+                    llm_chain=llm_chain,
+                    prompt_template=template,
+                    verbose=True
+                )
+                extracted_data = updater.update(extracted_data)
+                logger.info("Context metadata generated with LLM")
+                
+            # Step 3: Generate embeddings
+            try:
+                from langchain_huggingface import HuggingFaceEmbeddings
+            except ImportError:
+                # Fall back to older import path
+                from langchain.embeddings import HuggingFaceEmbeddings
+            
+            # Initialize embedding model
+            embedding_path = getattr(self, 'embedding_path', None)
+            if embedding_path and os.path.exists(embedding_path):
+                embeddings = HuggingFaceEmbeddings(model_name=embedding_path)
+            else:
+                embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            
+            # Generate embeddings
+            updater = EmbeddingUpdater(embedding_model=embeddings, verbose=True)
+            embedded_data = updater.update(extracted_data)
+            logger.info("Embeddings generated for extracted code snippets")
+            
+            # Step 4: Convert to DataFrame
+            converter = DataFrameConverter(verbose=True)
+            df = converter.to_dataframe(embedded_data)
+            logger.info(f"DataFrame created with {len(df)} rows")
+            
+            # Step 5: Store in vector database
+            writer = VectorStoreWriter(collection_name=self.collection_name, verbose=True)
+            writer.upsert_dataframe(df)
+            logger.info("Data stored in vector database")
+            
+            # Update collection reference
+            self.collection = writer.collection
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error generating code context: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
     
     def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
         """
-        Custom retriever function
+        Custom retriever function to get relevant code snippets based on a query.
         
         Args:
             query: The query string for retrieval
@@ -254,6 +398,9 @@ class CodeGenerationService(BaseGenerativeService):
         self.prompt_str = """You are a Python wizard tasked with generating code for a Jupyter Notebook (.ipynb) based on the given context.
 Your answer should consist of just the Python code, without any additional text or explanation.
 
+The context below contains code snippets from a GitHub repository that can help you generate the appropriate code.
+Use this code as a reference to understand structure, style, and patterns, but adapt it to solve the specific problem in the question.
+
 Context:
 {context}
 
@@ -280,26 +427,18 @@ Question: {question}
             logger.info("Loading vector store for retrieval")
             self.load_vector_store()
             
-            # Verify retriever readiness using either direct collection or fallback to LangChain retriever
-            if not self.collection and not self.retriever:
-                logger.error("Neither collection nor retriever is initialized")
-                raise ValueError("A retrieval mechanism must be initialized before creating the chain")
-                
+            # We don't require the retriever to be ready immediately, as repository context will be loaded on demand
             logger.info("Creating code generation chain")
-            # Create the chain using the custom_retriever function if collection is available,
-            # otherwise fall back to the standard retriever
-            if self.collection:
-                logger.info("Using direct collection querying for retrieval")
-                self.chain = {
-                    "context": lambda inputs: self.format_docs(self.custom_retriever(inputs["query"])),
-                    "question": RunnablePassthrough()
-                } | self.prompt | self.llm | StrOutputParser()
-            else:
-                logger.info("Using LangChain retriever fallback")
-                self.chain = {
-                    "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["query"])),
-                    "question": RunnablePassthrough()
-                } | self.prompt | self.llm | StrOutputParser()
+            
+            # Create the chain with enhanced error handling for empty or missing collections
+            self.chain = {
+                "context": lambda inputs: self.format_docs(
+                    self.custom_retriever(inputs["query"]) if self.collection else 
+                    [Document(page_content="No code context available. Please provide a repository URL.", metadata={})]
+                ),
+                "question": RunnablePassthrough()
+            } | self.prompt | self.llm | StrOutputParser()
+                
             logger.info("Code generation chain created successfully")
         except Exception as e:
             logger.error(f"Error creating code generation chain: {str(e)}")
@@ -310,13 +449,13 @@ Question: {question}
     
     def predict(self, context, model_input):
         """
-        Generate code based on the input question.
+        Generate code based on the input question and optional GitHub repository URL.
         
         Args:
             context: MLflow model context
             model_input: Input data for code generation, expecting either:
-                         - A direct dict with "question" field
-                         - A dict with "inputs" containing "question" or "query" fields
+                         - A direct dict with "question" and optional "repository_url" fields
+                         - A dict with "inputs" containing these fields
             
         Returns:
             Dictionary with the generated code in a "result" field
@@ -331,20 +470,9 @@ Question: {question}
             # Direct input format
             input_data = model_input
             
-        # Extract both query and question fields
-        query = ""
+        # Extract question and repository_url fields
         question = ""
-        
-        # Handle query field (used for retrieval)
-        if "query" in input_data:
-            if hasattr(input_data["query"], "iloc"):
-                query = input_data["query"].iloc[0] if not input_data["query"].empty else ""
-            else:
-                # Handle when it's a list (from API format) or a direct string
-                if isinstance(input_data["query"], list) and len(input_data["query"]) > 0:
-                    query = input_data["query"][0]
-                else:
-                    query = input_data["query"]
+        repository_url = ""
         
         # Handle question field (used for code generation prompt)
         if "question" in input_data:
@@ -357,17 +485,32 @@ Question: {question}
                 else:
                     question = input_data["question"]
         
-        # Check if both fields are provided
-        if not query:
-            logger.warning("No query provided for code generation retrieval")
-            return pd.DataFrame([{"result": "Error: No query provided for code generation retrieval."}])
-            
+        # Handle repository_url field (GitHub repository for context)
+        if "repository_url" in input_data:
+            if hasattr(input_data["repository_url"], "iloc"):
+                repository_url = input_data["repository_url"].iloc[0] if not input_data["repository_url"].empty else ""
+            else:
+                # Handle when it's a list (from API format) or a direct string
+                if isinstance(input_data["repository_url"], list) and len(input_data["repository_url"]) > 0:
+                    repository_url = input_data["repository_url"][0]
+                else:
+                    repository_url = input_data["repository_url"]
+        
+        # Check if question is provided
         if not question:
             logger.warning("No question provided for code generation prompt")
             return pd.DataFrame([{"result": "Error: No question provided for code generation prompt."}])
         
         try:
-            logger.info(f"Processing code generation request with query: {str(query)[:30]}... and question: {str(question)[:50]}...")
+            # Process GitHub repository if provided
+            if repository_url:
+                logger.info(f"Processing GitHub repository: {repository_url}")
+                success = self.generate_code_context(repository_url)
+                if not success:
+                    return pd.DataFrame([{"result": f"Error: Failed to process GitHub repository: {repository_url}"}])
+            else:
+                logger.info("No repository URL provided, using existing context database")
+            
             # Log some info about the collection state
             if self.collection:
                 try:
@@ -375,6 +518,11 @@ Question: {question}
                     logger.info(f"Collection '{self.collection_name}' has {count} documents")
                 except Exception as count_error:
                     logger.warning(f"Could not get collection count: {str(count_error)}")
+            else:
+                logger.warning("No collection available for retrieval. Results may lack context.")
+            
+            # Use the question as the query for retrieval
+            query = question
             
             # Create the input dictionary for the chain
             chain_input = {"query": query, "question": question}
@@ -448,7 +596,7 @@ Question: {question}
         
         # Define model input/output schema
         input_schema = Schema([
-            ColSpec("string", "query"),
+            ColSpec("string", "repository_url"),
             ColSpec("string", "question")
         ])
         output_schema = Schema([
@@ -496,11 +644,71 @@ Question: {question}
         )
         logger.info("Model and artifacts successfully registered in MLflow.")
     
+    def validate_github_url(self, url: str) -> bool:
+        """
+        Validate that the provided URL is a valid GitHub repository URL.
+        
+        Args:
+            url: URL to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
+        try:
+            if not url:
+                return False
+                
+            parsed = urlparse(url)
+            
+            # Check if it's a GitHub URL
+            if not parsed.netloc.endswith('github.com'):
+                logger.error(f"Not a GitHub URL: {url}")
+                return False
+                
+            # Check if it has owner/repo format
+            path_parts = [p for p in parsed.path.split('/') if p]
+            if len(path_parts) < 2:
+                logger.error(f"Invalid GitHub repository URL format: {url}")
+                return False
+                
+            return True
+        except Exception as e:
+            logger.error(f"Error validating GitHub URL: {str(e)}")
+            return False
+    
+    def cleanup_temp_repositories(self, max_age_hours: int = 24) -> None:
+        """
+        Clean up temporary repository directories older than the specified age.
+        
+        Args:
+            max_age_hours: Maximum age in hours for repositories to keep
+        """
+        try:
+            if not os.path.exists(self.temp_dir):
+                return
+                
+            import time
+            import shutil
+            
+            now = time.time()
+            max_age_seconds = max_age_hours * 60 * 60
+            
+            for item in os.listdir(self.temp_dir):
+                item_path = os.path.join(self.temp_dir, item)
+                if os.path.isdir(item_path):
+                    # Check if directory is older than max_age
+                    mtime = os.path.getmtime(item_path)
+                    if now - mtime > max_age_seconds:
+                        shutil.rmtree(item_path)
+                        logger.info(f"Removed old repository directory: {item_path}")
+        except Exception as e:
+            logger.error(f"Error cleaning up temporary repositories: {str(e)}")
+            
     def load_context(self, context) -> None:
         """
         Load context for the model, including configuration, model, and chains.
         This is an override of the BaseGenerativeService's load_context method to include
-        loading the embedding model from artifacts if available.
+        loading the embedding model from artifacts and cleaning up temp repositories.
         
         Args:
             context: MLflow model context
@@ -510,5 +718,71 @@ Question: {question}
             self.embedding_path = context.artifacts["embedding_model"]
             logger.info(f"Found embedding model artifact at {self.embedding_path}")
         
+        # Clean up old temporary repositories
+        self.cleanup_temp_repositories()
+        
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
+    
+    def extract_github_repository(self, repo_url: str, branch: str = "main") -> str:
+        """
+        Extract code files from a GitHub repository and save them to a local directory.
+        
+        Args:
+            repo_url: URL of the GitHub repository (e.g., 'https://github.com/user/repo')
+            branch: Branch name to extract code from (default: 'main')
+        
+        Returns:
+            Path to the directory containing the extracted code files
+        """
+        try:
+            logger.info(f"Extracting GitHub repository: {repo_url} (branch: {branch})")
+            
+            # Generate a unique ID for this extraction task
+            task_id = str(uuid.uuid4())
+            temp_repo_dir = os.path.join(self.temp_dir, task_id)
+            
+            # Ensure the temp directory for this task exists
+            os.makedirs(temp_repo_dir, exist_ok=True)
+            
+            # Extract the repository using the GitHubRepositoryExtractor
+            extractor = GitHubRepositoryExtractor(repo_url, branch, temp_repo_dir)
+            file_mapping = extractor.extract()
+            
+            logger.info(f"Extracted files: {file_mapping}")
+            
+            return temp_repo_dir
+        except Exception as e:
+            logger.error(f"Error extracting GitHub repository: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
+    
+    def update_context_with_repository(self, repo_path: str, question: str) -> str:
+        """
+        Update the code generation context with relevant code from the extracted repository.
+        
+        Args:
+            repo_path: Path to the directory containing the extracted code files
+            question: The question or prompt for code generation
+            
+        Returns:
+            Updated context string including relevant code snippets
+        """
+        try:
+            logger.info(f"Updating context with repository code: {repo_path}")
+            
+            # Use the LLMContextUpdater to analyze the repository and update the context
+            updater = LLMContextUpdater(repo_path, question)
+            updated_context = updater.update_context()
+            
+            logger.info("Context updated successfully")
+            
+            return updated_context
+        except Exception as e:
+            logger.error(f"Error updating context with repository: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
