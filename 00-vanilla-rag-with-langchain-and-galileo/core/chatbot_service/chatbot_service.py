@@ -257,9 +257,13 @@ class ChatbotService(BaseGenerativeService):
 
     def load_prompt(self) -> None:
         """Load the prompt template for the chatbot."""
-        self.prompt_str = """You are a virtual assistant for a Data Science platform called AI Studio. Answer the question based on the following context:
+        self.prompt_str = """You are a chatbot assistant for a Data Science platform created by HP, called 'Z by HP AI Studio'. 
+            Do not hallucinate and answer questions only if they are related to 'Z by HP AI Studio'. 
+            Now, answer the question perfectly based on the following context:
+
             {context}
-            Question: {input}
+
+            Question: {query}
             """
         self.prompt = ChatPromptTemplate.from_template(self.prompt_str)
 

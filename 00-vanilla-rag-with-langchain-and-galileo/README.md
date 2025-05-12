@@ -30,7 +30,9 @@ This project is an AI-powered vanilla **RAG (Retrieval-Augmented Generation)** c
 │   ├── index.html
 │   └── source
 ├── docs
-│   └── ui_vanilla_rag.png
+│   ├── html_ui_for_vanilla_rag.png
+│   ├── streamlit_ui_for_vanilla_rag.png.png
+│   └── successful streamlit ui result for vanilla rag.pdf
 ├── notebooks
 │   └── vanilla-rag-with-langchain-and-galileo.ipynb
 ├── README.md
@@ -44,7 +46,7 @@ This project is an AI-powered vanilla **RAG (Retrieval-Augmented Generation)** c
 ### Step 0: Minimum Hardware Requirements
 To ensure smooth execution and reliable model deployment, make sure your system meets the following minimum hardware specifications:
 
-- RAM: 32 GB 
+- RAM: 64 GB 
 - VRAM: 12 GB 
 - GPU: NVIDIA GPU 
 
@@ -109,7 +111,9 @@ This will:
 
 ### Successful Demonstration of the User Interface  
 
-![Vanilla RAG Demo UI](docs/ui_vanilla_rag.png)  
+![Vanilla RAG HTML UI](docs/html_ui_for_vanilla_rag.png)  
+
+![Vanilla RAG Streamlit UI](docs/streamlit_ui_for_vanilla_rag.png.png)  
 
 ---
 
