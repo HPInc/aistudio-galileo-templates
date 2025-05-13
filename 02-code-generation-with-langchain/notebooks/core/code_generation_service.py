@@ -189,7 +189,7 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
     
-    def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
+    def custom_retriever(self, query: str, top_n: int = None) -> List[Document]:
         """
         Custom retriever function to get relevant code snippets based on a query.
         
@@ -205,22 +205,24 @@ class CodeGenerationService(BaseGenerativeService):
             return []
             
         try:
-            logger.info(f"Retrieving documents for query: {query[:30]}... (top {top_n})")
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=top_n
+            # Import dynamic retriever from utils
+            from src.utils import dynamic_retriever, get_context_window
+            
+            # Get the model's context window for adaptive retrieval
+            context_window = None
+            if hasattr(self, 'llm'):
+                context_window = get_context_window(self.llm)
+            
+            logger.info(f"Retrieving documents for query: {query[:30]}... (context window: {context_window})")
+            
+            # Use the dynamic retriever for optimal document retrieval
+            return dynamic_retriever(
+                query=query,
+                collection=self.collection,
+                top_n=top_n,
+                context_window=context_window
             )
             
-            documents = [
-                Document(
-                    page_content=str(results['documents'][i]),
-                    metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]
-                )
-                for i in range(len(results['documents']))
-            ]
-            
-            logger.info(f"Retrieved {len(documents)} documents")
-            return documents
         except Exception as e:
             logger.error(f"Error retrieving documents: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
@@ -421,7 +423,16 @@ Question: {question}
         Returns:
             Formatted string of document contents
         """
-        return "\n\n".join([doc.page_content for doc in docs])
+        # Import adaptive context formatter from utils
+        from src.utils import format_docs_with_adaptive_context, get_context_window
+        
+        # Get the model's context window for adaptive formatting
+        context_window = None
+        if hasattr(self, 'llm'):
+            context_window = get_context_window(self.llm)
+            
+        # Use the adaptive context formatter for optimal document presentation
+        return format_docs_with_adaptive_context(docs, context_window)
     
     def load_chain(self) -> None:
         """Create the code generation chain using the loaded model, prompt, and retriever."""
@@ -432,10 +443,15 @@ Question: {question}
             
             logger.info("Creating code generation chain")
             
+            # Get the context window size for optimal document retrieval and formatting
+            from src.utils import get_context_window
+            context_window = get_context_window(self.llm) if self.llm else None
+            logger.info(f"Using context window of {context_window} tokens")
+            
             # Create the chain with enhanced error handling for empty or missing collections
             self.chain = {
                 "context": lambda inputs: self.format_docs(
-                    self.custom_retriever(inputs["query"]) if self.collection else 
+                    self.custom_retriever(inputs["query"], context_window=context_window) if self.collection else 
                     [Document(page_content="No code context available. Please provide a repository URL.", metadata={})]
                 ),
                 "question": RunnablePassthrough()

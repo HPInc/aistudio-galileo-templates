@@ -11,6 +11,40 @@ import importlib.util
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, List, Tuple
 
+# Context window sizes for various models
+MODEL_CONTEXT_WINDOWS = {
+    # LlamaCpp models
+    'ggml-model-f16-Q5_K_M.gguf': 4096,
+    'ggml-model-7b-q4_0.bin': 4096,
+    'gguf-model-7b-4bit.bin': 4096,
+    
+    # HuggingFace models
+    'mistralai/Mistral-7B-Instruct-v0.3': 8192,
+    'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B': 4096,
+    'meta-llama/Llama-2-7b-chat-hf': 4096,
+    'meta-llama/Llama-3-8b-chat-hf': 8192,
+    'google/flan-t5-base': 512,
+    'google/flan-t5-large': 512,
+    'TheBloke/WizardCoder-Python-7B-V1.0-GGUF': 4096,
+    
+    # OpenAI models
+    'gpt-3.5-turbo': 16385,
+    'gpt-4': 8192,
+    'gpt-4-32k': 32768,
+    'gpt-4-turbo': 128000,
+    'gpt-4o': 128000,
+    
+    # Anthropic models
+    'claude-3-opus-20240229': 200000,
+    'claude-3-sonnet-20240229': 180000,
+    'claude-3-haiku-20240307': 48000,
+    
+    # Other models
+    'qwen/Qwen-7B': 8192,
+    'microsoft/phi-2': 2048,
+    'tiiuae/falcon-7b': 4096,
+}
+
 
 def configure_hf_cache(cache_dir: str = "/home/jovyan/local/hugging_face") -> None:
     """
@@ -105,6 +139,9 @@ def initialize_llm(
     from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
     from langchain_community.llms import LlamaCpp
 
+    model = None
+    context_window = None
+    
     # Initialize based on model source
     if model_source == "hugging-face-cloud":
         if not secrets or "HUGGINGFACE_API_KEY" not in secrets:
@@ -112,25 +149,51 @@ def initialize_llm(
             
         huggingfacehub_api_token = secrets["HUGGINGFACE_API_KEY"]
         repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
-        return HuggingFaceEndpoint(
+        
+        # Get context window from our lookup table
+        if repo_id in MODEL_CONTEXT_WINDOWS:
+            context_window = MODEL_CONTEXT_WINDOWS[repo_id]
+            
+        model = HuggingFaceEndpoint(
             huggingfacehub_api_token=huggingfacehub_api_token,
             repo_id=repo_id,
         )
+        
     elif model_source == "hugging-face-local":
         from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
         
         model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+        
+        # Get context window from our lookup table
+        if model_id in MODEL_CONTEXT_WINDOWS:
+            context_window = MODEL_CONTEXT_WINDOWS[model_id]
+        
         tokenizer = AutoTokenizer.from_pretrained(model_id)
-        model = AutoModelForCausalLM.from_pretrained(model_id)
-        pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=100, device=0)
-        return HuggingFacePipeline(pipeline=pipe)
+        hf_model = AutoModelForCausalLM.from_pretrained(model_id)
+        
+        # If tokenizer has model_max_length, that's our context window
+        if hasattr(tokenizer, 'model_max_length') and tokenizer.model_max_length not in (None, -1):
+            context_window = tokenizer.model_max_length
+            
+        pipe = pipeline("text-generation", model=hf_model, tokenizer=tokenizer, max_new_tokens=100, device=0)
+        model = HuggingFacePipeline(pipeline=pipe)
+        
     elif model_source == "local":
         callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-        return LlamaCpp(
+        
+        # For LlamaCpp, get the context window from the filename
+        model_filename = os.path.basename(local_model_path)
+        if model_filename in MODEL_CONTEXT_WINDOWS:
+            context_window = MODEL_CONTEXT_WINDOWS[model_filename]
+        else:  
+            # Default context window for LlamaCpp models (explicitly set)
+            context_window = 4096
+        
+        model = LlamaCpp(
             model_path=local_model_path,
             n_gpu_layers=-1,
             n_batch=512,
-            n_ctx=4096,
+            n_ctx=context_window,
             max_tokens=1024,
             f16_kv=True,
             callback_manager=callback_manager,
@@ -141,6 +204,12 @@ def initialize_llm(
         )
     else:
         raise ValueError(f"Unsupported model source: {model_source}")
+    
+    # Store context window as model attribute for easy access
+    if model and hasattr(model, '__dict__'):
+        model.__dict__['_context_window'] = context_window
+    
+    return model
 
 
 def setup_galileo_environment(secrets: Dict[str, Any], console_url: str = "https://console.hp.galileocloud.io/") -> None:
@@ -267,15 +336,15 @@ def initialize_galileo_observer(project_name: str):
 
 def get_model_context_window(model) -> int:
     """
-    Detect or estimate the context window size of a language model.
+    Get context window using model identifier and lookup table.
     
-    This function systematically examines the model object to determine its context window size,
-    using a comprehensive hierarchical approach:
+    This function simplifies context window resolution by using a lookup table
     
-    1. Try to access model-specific context window attributes directly
-    2. Look for context window information in the model's configuration
-    3. For pipeline models, inspect both the tokenizer and underlying model structure
-    4. As a last resort, make an educated guess based on model name/type
+    1. For LlamaCpp models: extract the filename from model_path and check in MODEL_CONTEXT_WINDOWS
+    2. For HuggingFace models: check the repo_id in MODEL_CONTEXT_WINDOWS
+    3. Fall back to explicit parameters if available
+    4. Try to get context window from a stored attribute (_context_window) on the model
+    5. Use a default conservative estimate if all else fails
     
     Args:
         model: Any language model object (LlamaCpp, HuggingFace, OpenAI, etc.)
@@ -283,147 +352,60 @@ def get_model_context_window(model) -> int:
     Returns:
         int: The determined context window size in tokens, defaulting to 2048 if detection fails
     """
-    # === Direct attribute checks ===
+    # Check if we already stored the context window in the model itself
+    if hasattr(model, '_context_window') and model._context_window is not None:
+        return model._context_window
     
-    # Check for LlamaCpp models from LangChain
-    if str(type(model)).find('LlamaCpp') > -1:
-        # LlamaCpp models from LangChain store n_ctx in multiple possible places
-        if hasattr(model, '_n_ctx') and model._n_ctx is not None:
-            return model._n_ctx
-        if hasattr(model, 'n_ctx') and model.n_ctx is not None:
-            return model.n_ctx
+    # For LlamaCpp: extract filename from model_path
+    if hasattr(model, 'model_path'):
+        model_filename = os.path.basename(model.model_path)
+        if model_filename in MODEL_CONTEXT_WINDOWS:
+            return MODEL_CONTEXT_WINDOWS[model_filename]
     
-    # Llama.cpp Python binding
-    if hasattr(model, 'context_params') and hasattr(model.context_params, 'n_ctx'):
-        return model.context_params.n_ctx
+    # For HuggingFace models: check repo_id
+    if hasattr(model, 'repo_id'):
+        if model.repo_id in MODEL_CONTEXT_WINDOWS:
+            return MODEL_CONTEXT_WINDOWS[model.repo_id]
     
-    # Common direct attributes
-    for attr_name in ['max_seq_len', 'max_position_embeddings', 'n_positions', 'max_sequence_length']:
-        if hasattr(model, attr_name):
-            attr_value = getattr(model, attr_name)
-            if isinstance(attr_value, int) and attr_value > 0:
-                return attr_value
+    # Fall back to direct n_ctx attribute if available
+    if hasattr(model, 'n_ctx'):
+        return model.n_ctx
     
-    # === Check model configuration ===
-    
-    # Access transformer models' configuration
-    # This handles most HuggingFace models
-    if hasattr(model, 'config'):
-        config = model.config
-        
-        # Try common config attributes for context window
-        for attr_name in [
-            'max_position_embeddings', 'n_positions', 'n_ctx', 
-            'max_sequence_length', 'context_length', 'model_max_length'
-        ]:
-            if hasattr(config, attr_name):
-                attr_value = getattr(config, attr_name)
-                if isinstance(attr_value, int) and attr_value > 0:
-                    return attr_value
-                
-    # === Check for HuggingFace pipeline wrappers ===
-    
-    # HuggingFacePipeline wrapper from langchain
-    if hasattr(model, 'pipeline'):
-        pipeline = model.pipeline
-        
-        # Try to get from tokenizer in pipeline
-        if hasattr(pipeline, 'tokenizer'):
-            tokenizer = pipeline.tokenizer
-            if hasattr(tokenizer, 'model_max_length'):
-                if isinstance(tokenizer.model_max_length, int) and tokenizer.model_max_length > 0 and tokenizer.model_max_length != 1000000000000000019884624838656:  # Exclude infinity value
-                    return tokenizer.model_max_length
-        
-        # Next, check pipeline.model configuration
-        if hasattr(pipeline, 'model'):
-            model_obj = pipeline.model
-            
-            # Check for config in model
-            if hasattr(model_obj, 'config'):
-                config = model_obj.config
-                
-                # Comprehensive check of all possible config attributes for context window
-                for attr_name in [
-                    'max_position_embeddings', 'n_positions', 'n_ctx', 
-                    'max_sequence_length', 'context_length', 'model_max_length',
-                    'n_positions', 'max_length', 'seq_length'
-                ]:
-                    if hasattr(config, attr_name):
-                        attr_value = getattr(config, attr_name)
-                        if isinstance(attr_value, int) and attr_value > 0:
-                            return attr_value
-            
-            # For models without a normal config structure, check model attributes directly
-            for attr_name in ['max_seq_len', 'n_ctx', 'n_positions', 'max_position_embeddings']:
-                if hasattr(model_obj, attr_name):
-                    attr_value = getattr(model_obj, attr_name)
-                    if isinstance(attr_value, int) and attr_value > 0:
-                        return attr_value
-    
-    # === Check model kwargs (initialization parameters) ===
-    
-    # Many wrappers store initialization parameters
+    # Check model_kwargs for context window parameters
     if hasattr(model, 'model_kwargs'):
         kwargs = model.model_kwargs
         for param_name in ['n_ctx', 'max_tokens', 'max_length', 'context_window']:
-            if param_name in kwargs:
-                if isinstance(kwargs[param_name], int) and kwargs[param_name] > 0:
-                    return kwargs[param_name]
+            if param_name in kwargs and kwargs[param_name] is not None:
+                return kwargs[param_name]
     
-    # === Inspect actual model architecture for constants ===
-    
-    # For HuggingFace pipeline models, extract info from the underlying model architecture
-    if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'model'):
-        try:
-            # Try to extract useful constants from model configurations
-            underlying_model = model.pipeline.model
+    # For HuggingFace pipeline models: check tokenizer
+    if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'tokenizer') and hasattr(model.pipeline.tokenizer, 'model_max_length'):
+        if model.pipeline.tokenizer.model_max_length > 0 and model.pipeline.tokenizer.model_max_length < 1000000000000000:
+            return model.pipeline.tokenizer.model_max_length
             
-            # Check the model config dictionary for relevant parameters
-            if hasattr(underlying_model, 'config') and hasattr(underlying_model.config, 'to_dict'):
-                config_dict = underlying_model.config.to_dict()
-                
-                # Look for parameters that might indicate context window size
-                # These names cover most transformer model architectures
-                for key in config_dict:
-                    if isinstance(config_dict[key], int) and config_dict[key] > 1024:
-                        key_lower = key.lower()
-                        if ('context' in key_lower or 'window' in key_lower or 
-                            'position' in key_lower or 'seq' in key_lower and 'len' in key_lower or
-                            'embed' in key_lower and 'pos' in key_lower or 'n_ctx' in key_lower):
-                            return config_dict[key]
-        except:
-            pass  # Continue to fallbacks if extraction fails
-    
-    # === String-based fallback (last resort) ===
-    
-    # Only use string matching as a last resort
-    model_str = str(model).lower()
-    
-    # If the model is using LlamaCpp, default to 4096 tokens
-    # (Check both class name and string representation)
-    if "llamacpp" in model_str or "llama.cpp" in model_str:
-        return 4096  # Common default for LlamaCpp models
-    
-    # Use a dictionary for known model families context windows
-    model_families = {
-        'llama-2': 4096,
-        'llama-3': 8192,
-        'mistral': 8192,
-        'mixtral': 32768,
-        'deepseek': 4096,
-        'qwen': 8192,
-        'falcon': 4096,
-        'gpt-3.5': 16385,
-        'gpt-4': 8192,
-    }
-    
-    # Check for model family matches
-    for family, ctx_size in model_families.items():
-        if family in model_str:
-            return ctx_size
-    
-    # Final fallback - conservative estimate
+    # Use a very conservative default if all detection methods fail
     return 2048
+
+
+def get_context_window(model) -> int:
+    """
+    Get context window size from model.
+    
+    This function first checks for the explicit _context_window attribute
+    that we set during initialization, then falls back to the more
+    complex detection logic if needed.
+    
+    Args:
+        model: Any language model object
+        
+    Returns:
+        int: The context window size in tokens
+    """
+    if hasattr(model, '_context_window') and model._context_window is not None:
+        return model._context_window
+        
+    # Fall back to detection logic
+    return get_model_context_window(model)
 
 
 def dynamic_retriever(query: str, collection, top_n: int = None, context_window: int = None) -> List:
@@ -579,163 +561,7 @@ def format_docs_with_adaptive_context(docs, context_window: int = None) -> str:
         if total_chars >= max_total_chars:
             break
     
-    # Add diagnostic info about context usage
-    estimated_tokens_used = total_chars // chars_per_token
-    estimated_context_percent = round(100 * estimated_tokens_used / context_window, 1) if context_window else "unknown"
-    
-    diagnostic = f"/* Context usage: {estimated_tokens_used} tokens ({estimated_context_percent}% of context window) */\n"
-    
     # Join everything together with clear separators
-    formatted_text = diagnostic + "\n\n".join(formatted_docs)
+    formatted_text = "\n\n".join(formatted_docs)
             
     return formatted_text
-
-def diagnose_model_context_window(model) -> Dict[str, Any]:
-    """
-    Diagnose model context window detection issues by examining model attributes.
-    
-    This helper function explores various attributes of a model object that might
-    contain information about its context window size. It's useful for debugging
-    why context window detection might be failing.
-    
-    Args:
-        model: The model object to diagnose
-        
-    Returns:
-        Dict with diagnosis information
-    """
-    diagnosis = {
-        'model_type': str(type(model)),
-        'detected_attributes': [],
-        'recommended_context_window': None
-    }
-    
-    # Check direct model attributes
-    direct_attrs = {
-        '_n_ctx': None, 'n_ctx': None, 'max_seq_len': None, 
-        'max_position_embeddings': None, 'n_positions': None, 
-        'max_sequence_length': None, 'context_length': None
-    }
-    for attr_name in direct_attrs:
-        if hasattr(model, attr_name):
-            attr_value = getattr(model, attr_name)
-            direct_attrs[attr_name] = attr_value
-            if isinstance(attr_value, int) and attr_value > 0:
-                diagnosis['detected_attributes'].append(f"{attr_name}: {attr_value}")
-                if not diagnosis['recommended_context_window']:
-                    diagnosis['recommended_context_window'] = attr_value
-    
-    diagnosis['direct_attributes'] = direct_attrs
-    
-    # Check config
-    config_data = {}
-    if hasattr(model, 'config'):
-        config = model.config
-        config_data['has_config'] = True
-        config_attrs = {
-            'max_position_embeddings': None, 'n_positions': None, 
-            'n_ctx': None, 'max_sequence_length': None, 
-            'context_length': None, 'model_max_length': None
-        }
-        
-        for attr_name in config_attrs:
-            if hasattr(config, attr_name):
-                attr_value = getattr(config, attr_name) 
-                config_attrs[attr_name] = attr_value
-                if isinstance(attr_value, int) and attr_value > 0:
-                    diagnosis['detected_attributes'].append(f"config.{attr_name}: {attr_value}")
-                    if not diagnosis['recommended_context_window']:
-                        diagnosis['recommended_context_window'] = attr_value
-    else:
-        config_data['has_config'] = False
-    
-    diagnosis['config'] = config_data
-    
-    # Check pipeline
-    pipeline_data = {}
-    if hasattr(model, 'pipeline'):
-        pipeline = model.pipeline
-        pipeline_data['has_pipeline'] = True
-        
-        # Check tokenizer
-        if hasattr(pipeline, 'tokenizer'):
-            tokenizer = pipeline.tokenizer
-            pipeline_data['has_tokenizer'] = True
-            
-            if hasattr(tokenizer, 'model_max_length'):
-                pipeline_data['tokenizer_model_max_length'] = tokenizer.model_max_length
-                diagnosis['detected_attributes'].append(f"pipeline.tokenizer.model_max_length: {tokenizer.model_max_length}")
-                if not diagnosis['recommended_context_window'] and isinstance(tokenizer.model_max_length, int) and tokenizer.model_max_length > 0:
-                    diagnosis['recommended_context_window'] = tokenizer.model_max_length
-        else:
-            pipeline_data['has_tokenizer'] = False
-            
-        # Check pipeline.model
-        if hasattr(pipeline, 'model'):
-            pipeline_model = pipeline.model
-            pipeline_data['has_model'] = True
-            
-            # Check pipeline.model.config
-            if hasattr(pipeline_model, 'config'):
-                config = pipeline_model.config
-                pipeline_data['model_has_config'] = True
-                
-                for attr_name in ['max_position_embeddings', 'n_positions', 'n_ctx', 
-                                 'max_sequence_length', 'context_length', 'model_max_length']:
-                    if hasattr(config, attr_name):
-                        attr_value = getattr(config, attr_name)
-                        pipeline_data[f"model_config_{attr_name}"] = attr_value
-                        
-                        if isinstance(attr_value, int) and attr_value > 0:
-                            diagnosis['detected_attributes'].append(f"pipeline.model.config.{attr_name}: {attr_value}")
-                            if not diagnosis['recommended_context_window']:
-                                diagnosis['recommended_context_window'] = attr_value
-            else:
-                pipeline_data['model_has_config'] = False
-        else:
-            pipeline_data['has_model'] = False
-    else:
-        pipeline_data['has_pipeline'] = False
-        
-    diagnosis['pipeline'] = pipeline_data
-    
-    # Check model_kwargs
-    kwargs_data = {}
-    if hasattr(model, 'model_kwargs'):
-        kwargs = model.model_kwargs
-        kwargs_data['has_model_kwargs'] = True
-        kwargs_data['model_kwargs'] = kwargs
-        
-        for param_name in ['n_ctx', 'max_tokens', 'max_length', 'context_window']:
-            if param_name in kwargs:
-                param_value = kwargs[param_name]
-                if isinstance(param_value, int) and param_value > 0:
-                    diagnosis['detected_attributes'].append(f"model_kwargs[{param_name}]: {param_value}")
-                    if not diagnosis['recommended_context_window']:
-                        diagnosis['recommended_context_window'] = param_value
-    else:
-        kwargs_data['has_model_kwargs'] = False
-        
-    diagnosis['model_kwargs'] = kwargs_data
-    
-    # String-based detection as last resort
-    model_str = str(model).lower()
-    
-    # Look for specific model types in string representation
-    for model_name, window_size in [
-        ('llama-2-7b', 4096), ('llama-2-13b', 4096), ('llama-2-70b', 4096),
-        ('llama-3', 8192), ('gpt-3.5', 16385), ('gpt-4', 8192),
-        ('mistral', 8192), ('mixtral', 32768), ('deepseek', 4096),
-        ('qwen', 8192), ('falcon', 4096)
-    ]:
-        if model_name in model_str:
-            diagnosis['detected_attributes'].append(f"String match: '{model_name}' -> {window_size}")
-            if not diagnosis['recommended_context_window']:
-                diagnosis['recommended_context_window'] = window_size
-    
-    # Fallback recommendation if nothing was found
-    if not diagnosis['recommended_context_window']:
-        diagnosis['recommended_context_window'] = 2048  # Conservative fallback
-        diagnosis['detected_attributes'].append("Using conservative fallback: 2048")
-    
-    return diagnosis
