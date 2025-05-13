@@ -263,3 +263,279 @@ def initialize_galileo_observer(project_name: str):
         raise ImportError("galileo_observe is required but not installed")
     
     return GalileoObserveCallback(project_name=project_name)
+
+
+def get_model_context_window(model) -> int:
+    """
+    Detect or estimate the context window size of a language model.
+    
+    This function examines the model object to determine its context window size,
+    using a deterministic approach with multiple fallbacks:
+    1. Direct model attributes (e.g., n_ctx, max_seq_len, etc.)
+    2. Model configuration objects (e.g., from transformers models)
+    3. Values from model creation parameters (model_kwargs)
+    4. Pipeline tokenizer max_length attributes
+    5. As a last resort, default values based on model name pattern matching
+    
+    Args:
+        model: The language model object (LlamaCpp, HF model, OpenAI model, etc.)
+        
+    Returns:
+        int: The determined context window size in tokens
+    """
+    # === Direct attribute checks ===
+    
+    # LlamaCpp models from langchain
+    if hasattr(model, '_n_ctx') and model._n_ctx is not None:
+        return model._n_ctx
+    
+    # Llama.cpp Python binding
+    if hasattr(model, 'context_params') and hasattr(model.context_params, 'n_ctx'):
+        return model.context_params.n_ctx
+    
+    # Common direct attributes
+    for attr_name in ['max_seq_len', 'max_position_embeddings', 'n_positions', 'max_sequence_length']:
+        if hasattr(model, attr_name):
+            attr_value = getattr(model, attr_name)
+            if isinstance(attr_value, int) and attr_value > 0:
+                return attr_value
+    
+    # === Check model configuration ===
+    
+    # Access transformer models' configuration
+    # This handles most HuggingFace models
+    if hasattr(model, 'config'):
+        config = model.config
+        
+        # Try common config attributes for context window
+        for attr_name in [
+            'max_position_embeddings', 'n_positions', 'n_ctx', 
+            'max_sequence_length', 'context_length', 'model_max_length'
+        ]:
+            if hasattr(config, attr_name):
+                attr_value = getattr(config, attr_name)
+                if isinstance(attr_value, int) and attr_value > 0:
+                    return attr_value
+                
+    # === Check for HuggingFace pipeline wrappers ===
+    
+    # HuggingFacePipeline wrapper from langchain
+    if hasattr(model, 'pipeline'):
+        pipeline = model.pipeline
+        
+        # Try to get from tokenizer in pipeline
+        if hasattr(pipeline, 'tokenizer'):
+            tokenizer = pipeline.tokenizer
+            
+            # Most HF tokenizers have model_max_length
+            if hasattr(tokenizer, 'model_max_length'):
+                if isinstance(tokenizer.model_max_length, int) and tokenizer.model_max_length > 0:
+                    return tokenizer.model_max_length
+    
+    # === Check model kwargs (initialization parameters) ===
+    
+    # Many wrappers store initialization parameters
+    if hasattr(model, 'model_kwargs'):
+        kwargs = model.model_kwargs
+        for param_name in ['n_ctx', 'max_tokens', 'max_length']:
+            if param_name in kwargs:
+                if isinstance(kwargs[param_name], int) and kwargs[param_name] > 0:
+                    return kwargs[param_name]
+    
+    # === String-based fallback (last resort) ===
+    
+    # Only use string matching as a last resort
+    model_str = str(model).lower()
+    
+    # Use a dictionary for known model families context windows
+    model_families = {
+        'llama-2-7b': 4096,
+        'llama-2-13b': 4096,  
+        'llama-2-70b': 4096,
+        'llama-3-8b': 8192,
+        'llama-3-70b': 8192,
+        'gpt-3.5': 16385,     # Updated for gpt-3.5-turbo-0125
+        'gpt-4': 8192,        # Base GPT-4
+        'gpt-4-32k': 32768,   # Extended context GPT-4
+        'gpt-4-turbo': 128000, # Latest as of May 2024
+        'mistral-7b': 8192,
+        'mixtral-8x7b': 32768,
+        'deepseek': 4096,
+        'falcon': 4096,
+        'qwen': 8192,
+        'claude': 100000,     # Claude 3 Opus
+        'gemini': 32768,      # Gemini 1.0 Pro
+    }
+    
+    # Check for model family matches
+    for family, ctx_size in model_families.items():
+        if family in model_str:
+            return ctx_size
+    
+    # Final fallback - conservative estimate
+    return 2048
+
+
+def dynamic_retriever(query: str, collection, top_n: int = None, context_window: int = None) -> List:
+    """
+    Retrieve relevant documents with dynamic adaptation based on context window.
+    
+    This function automatically determines how many documents to retrieve based on
+    the available context window, optimizing for the specific model being used.
+    
+    Args:
+        query: The search query
+        collection: Vector database collection to search in
+        top_n: Number of documents to retrieve (if None, will be determined dynamically)
+        context_window: Size of the model's context window in tokens
+        
+    Returns:
+        List: Document objects containing relevant content
+    """
+    from langchain.schema import Document
+    
+    # Dynamically determine how many documents to retrieve based on context window
+    if top_n is None:
+        if context_window:
+            # Larger context windows can handle more documents
+            # Using a heuristic: 1 document per 1000 tokens of context
+            # with a minimum of 2 and maximum of 10
+            suggested_top_n = max(2, min(10, context_window // 1000))
+            top_n = suggested_top_n
+        else:
+            # Default if we can't determine context window
+            top_n = 3
+    
+    # Get the most relevant documents
+    results = collection.query(
+        query_texts=[query],
+        n_results=top_n
+    )
+    
+    # Convert to Document objects
+    documents = [
+        Document(
+            page_content=str(results['documents'][i]),
+            metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]  
+        )
+        for i in range(len(results['documents']))
+    ]
+    
+    return documents
+
+
+def format_docs_with_adaptive_context(docs, context_window: int = None) -> str:
+    """
+    Format retrieved documents using dynamic allocation based on model context window.
+    
+    This function:
+    1. Adapts to the model's context window size
+    2. Keeps full content for the most relevant document when possible
+    3. Distributes remaining context based on document relevance
+    4. Preserves code structure by breaking at logical points
+    5. Provides diagnostics about context usage
+    
+    Args:
+        docs: List of Document objects to format
+        context_window: Size of the model's context window in tokens (if provided)
+        
+    Returns:
+        Formatted context string for the LLM
+    """
+    if not docs:
+        return ""
+        
+    # Average characters per token (this is an approximation)
+    chars_per_token = 4
+    
+    # Determine the maximum character budget based on context window
+    if context_window:
+        # Reserve 20% for the prompt and response
+        available_tokens = int(context_window * 0.8)
+        max_total_chars = available_tokens * chars_per_token
+    else:
+        # Default conservative estimate if we don't know the context window
+        max_total_chars = 8000
+    
+    # Track metrics for diagnostic output
+    formatted_docs = []
+    total_chars = 0
+    doc_allocation = []
+    
+    # Process documents by relevance order
+    for i, doc in enumerate(docs):
+        content = doc.page_content
+        original_length = len(content)
+        
+        # Distribute context budget based on relevance
+        # First document gets up to 50% of remaining budget, but don't exceed its actual size
+        if i == 0:
+            # Give the first (most relevant) document up to 50% of the budget
+            budget_fraction = 0.5
+        else:
+            # Distribute remaining budget exponentially declining by relevance
+            budget_fraction = 0.5 / (2 ** i)
+        
+        chars_to_allocate = min(
+            int(max_total_chars * budget_fraction),  # Relevance-based allocation
+            original_length,  # Don't allocate more than needed
+            max_total_chars - total_chars  # Don't exceed remaining budget
+        )
+        
+        # If we can fit the whole document, do it
+        if original_length <= chars_to_allocate:
+            formatted_docs.append(content)
+            used_chars = original_length
+            truncated = False
+        # Otherwise, truncate it
+        elif chars_to_allocate > 0:
+            # Try to break at a logical point like a line break
+            truncation_point = min(chars_to_allocate, original_length)
+            
+            # Find a good break point - prefer newlines, then periods, then spaces
+            last_newline = content[:truncation_point].rfind('\n')
+            last_period = content[:truncation_point].rfind('.')
+            last_space = content[:truncation_point].rfind(' ')
+            
+            # Use the best break point that's not too far from target (at least 80% of target)
+            threshold = truncation_point * 0.8
+            if last_newline > threshold:
+                truncation_point = last_newline + 1  # +1 to include the newline
+            elif last_period > threshold:
+                truncation_point = last_period + 1  # +1 to include the period
+            elif last_space > threshold:
+                truncation_point = last_space + 1  # +1 to include the space
+            
+            formatted_content = f"{content[:truncation_point]}... (truncated)"
+            formatted_docs.append(formatted_content)
+            used_chars = truncation_point + 15  # +15 for the truncation message
+            truncated = True
+        else:
+            # No budget left for this document
+            break
+            
+        # Track allocation for diagnostic output
+        doc_allocation.append({
+            'document': i+1,
+            'original_chars': original_length,
+            'allocated_chars': used_chars,
+            'truncated': truncated,
+            'percent_used': round(100 * used_chars / original_length, 1) if original_length > 0 else 100
+        })
+        
+        total_chars += used_chars
+        
+        # Stop if we've reached our budget
+        if total_chars >= max_total_chars:
+            break
+    
+    # Add diagnostic info about context usage
+    estimated_tokens_used = total_chars // chars_per_token
+    estimated_context_percent = round(100 * estimated_tokens_used / context_window, 1) if context_window else "unknown"
+    
+    diagnostic = f"/* Context usage: {estimated_tokens_used} tokens ({estimated_context_percent}% of context window) */\n"
+    
+    # Join everything together with clear separators
+    formatted_text = diagnostic + "\n\n".join(formatted_docs)
+            
+    return formatted_text
