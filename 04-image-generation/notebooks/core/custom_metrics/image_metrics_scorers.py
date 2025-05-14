@@ -15,7 +15,7 @@ def set_custom_image_path(path: str) -> None:
     """
     global CUSTOM_IMAGE_PATH
     CUSTOM_IMAGE_PATH = path
-    print(f"[set_custom_image_path] CUSTOM_IMAGE_PATH atualizado para: {CUSTOM_IMAGE_PATH}")
+    print(f"[set_custom_image_path] CUSTOM_IMAGE_PATH: {CUSTOM_IMAGE_PATH}")
 
 # --- Auxiliary functions ---
 
