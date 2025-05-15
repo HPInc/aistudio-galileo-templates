@@ -255,43 +255,100 @@ def clean_code(result: str) -> str:
     """
     if not result or not isinstance(result, str):
         return ""
-        
-    # Remove common prefixes
-    prefixes = ["Answer:", "Expected Answer:", "Python code:", "Here's the code:"]
+    
+    # Remove common prefixes and wrapper text    
+    prefixes = ["Answer:", "Expected Answer:", "Python code:", "Here's the code:", "My Response:", "Response:"]
     for prefix in prefixes:
         if result.lstrip().startswith(prefix):
             result = result.replace(prefix, "", 1)
     
     # Handle markdown code blocks
     if "```python" in result or "```" in result:
-        # Extract code from markdown code blocks
-        result = result.replace("```python", "").replace("```", "")
+        # Extract code between markdown code blocks
+        code_blocks = []
+        in_code_block = False
+        lines = result.split('\n')
+        current_block = []
+        
+        for line in lines:
+            if line.strip().startswith("```"):
+                if in_code_block:
+                    # End of block, add it to our list
+                    code_blocks.append("\n".join(current_block))
+                    current_block = []
+                in_code_block = not in_code_block
+                continue
+            
+            if in_code_block:
+                current_block.append(line)
+        
+        if code_blocks:
+            # Use the longest code block found
+            result = max(code_blocks, key=len)
+        else:
+            # Fallback to simple replacement if block extraction fails
+            result = result.replace("```python", "").replace("```", "")
     
     # Remove any remaining explanatory text before or after the code
     lines = result.split('\n')
     code_lines = []
-    in_code_block = True  # Assume we're in a code block initially
+    in_code_block = False
     
+    # First, look for the first actual code line
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped and (stripped.startswith('import ') or 
+                       stripped.startswith('from ') or
+                       stripped.startswith('def ') or
+                       stripped.startswith('class ')):
+            in_code_block = True
+            lines = lines[i:]  # Start from this line
+            break
+    
+    # Now process all the lines
     for line in lines:
         stripped = line.strip()
         # Skip empty lines at the beginning
         if not stripped and not code_lines:
             continue
+            
+        # Ignore lines that appear to be LLM "thinking" or explanations
+        if any(text in stripped.lower() for text in ["here's", "i'll", "please provide", "this code will"]):
+            if not any(code_indicator in stripped for code_indicator in ["import ", "def ", "class ", "="]):
+                continue
+                
         # If we see code-like content, include it
         if stripped and (stripped.startswith('import ') or 
-                         stripped.startswith('from ') or
-                         stripped.startswith('def ') or
-                         stripped.startswith('class ') or
-                         '=' in stripped or
-                         stripped.startswith('#') or
-                         '(' in stripped):
+                       stripped.startswith('from ') or
+                       stripped.startswith('def ') or
+                       stripped.startswith('class ') or
+                       '=' in stripped or
+                       stripped.startswith('#') or
+                       '(' in stripped or
+                       '.' in stripped and not stripped.endswith('.') or
+                       stripped.startswith('with ') or
+                       stripped.startswith('if ') or
+                       stripped.startswith('for ') or
+                       stripped.startswith('while ') or
+                       stripped.startswith('@')):
             in_code_block = True
             code_lines.append(line)
         # Include indented lines or lines continuing code
-        elif stripped and in_code_block:
+        elif stripped and (in_code_block or line.startswith(' ') or line.startswith('\t')):
             code_lines.append(line)
     
-    return '\n'.join(code_lines).strip()
+    cleaned_code = '\n'.join(code_lines).strip()
+    
+    # One last check - if the cleaned code starts with text that looks like a response,
+    # try to find the first actual code statement
+    first_lines = cleaned_code.split('\n', 5)
+    for i, line in enumerate(first_lines):
+        if line.strip().startswith(('import ', 'from ', 'def ', 'class ')):
+            if i > 0:
+                cleaned_code = '\n'.join(first_lines[i:] + cleaned_code.split('\n')[5:])
+            break
+    
+    return cleaned_code
 
 
 def generate_code_with_retries(chain, example_input, callbacks=None, max_attempts=3, min_code_length=10):
