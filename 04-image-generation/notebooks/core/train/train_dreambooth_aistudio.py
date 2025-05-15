@@ -540,6 +540,14 @@ def parse_args(input_args=None):
         choices=["DPMSolverMultistepScheduler", "DDPMScheduler"],
         help="Select which scheduler to use for validation. DDPMScheduler is recommended for DeepFloyd IF.",
     )
+    parser.add_argument(
+        "--log_level",
+        type=str,
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Verbosity of Python logging and HF libraries.",
+    )
+
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -739,6 +747,13 @@ def model_has_vae(args):
         return any(file.rfilename == config_file_name for file in files_in_repo)
 
 def main(args):
+    level = getattr(logging, args.log_level.upper())  # ex.: "ERROR" → logging.ERROR
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=level,
+    )
+    
     mlflow.set_experiment("finetuning-stable-diffussion")
     mlflow.start_run()
     mlflow.log_params(vars(args))
