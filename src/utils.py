@@ -21,7 +21,6 @@ def configure_hf_cache(cache_dir: str = "/home/jovyan/local/hugging_face") -> No
     """
     os.environ["HF_HOME"] = cache_dir
     os.environ["HF_HUB_CACHE"] = os.path.join(cache_dir, "hub")
-    os.environ["TRANSFORMERS_CACHE"] = os.path.join(cache_dir, "transformers")
 
 
 def load_config_and_secrets(
@@ -242,6 +241,106 @@ def login_huggingface(secrets: Dict[str, Any]) -> None:
     
     login(token=token)
     print("✅ Logged into Hugging Face successfully.")
+
+
+def clean_code(result: str) -> str:
+    """
+    Clean code extraction function that handles various formats.
+    
+    Args:
+        result: The raw text output from an LLM that may contain code.
+        
+    Returns:
+        str: Cleaned code without markdown formatting or explanatory text.
+    """
+    if not result or not isinstance(result, str):
+        return ""
+        
+    # Remove common prefixes
+    prefixes = ["Answer:", "Expected Answer:", "Python code:", "Here's the code:"]
+    for prefix in prefixes:
+        if result.lstrip().startswith(prefix):
+            result = result.replace(prefix, "", 1)
+    
+    # Handle markdown code blocks
+    if "```python" in result or "```" in result:
+        # Extract code from markdown code blocks
+        result = result.replace("```python", "").replace("```", "")
+    
+    # Remove any remaining explanatory text before or after the code
+    lines = result.split('\n')
+    code_lines = []
+    in_code_block = True  # Assume we're in a code block initially
+    
+    for line in lines:
+        stripped = line.strip()
+        # Skip empty lines at the beginning
+        if not stripped and not code_lines:
+            continue
+        # If we see code-like content, include it
+        if stripped and (stripped.startswith('import ') or 
+                         stripped.startswith('from ') or
+                         stripped.startswith('def ') or
+                         stripped.startswith('class ') or
+                         '=' in stripped or
+                         stripped.startswith('#') or
+                         '(' in stripped):
+            in_code_block = True
+            code_lines.append(line)
+        # Include indented lines or lines continuing code
+        elif stripped and in_code_block:
+            code_lines.append(line)
+    
+    return '\n'.join(code_lines).strip()
+
+
+def generate_code_with_retries(chain, example_input, callbacks=None, max_attempts=3, min_code_length=10):
+    """
+    Execute a chain with retry logic for empty or short responses.
+    
+    Args:
+        chain: The LangChain chain to execute.
+        example_input: Input dictionary with query and question.
+        callbacks: Optional callbacks to pass to the chain.
+        max_attempts: Maximum number of attempts before giving up.
+        min_code_length: Minimum acceptable code length.
+        
+    Returns:
+        tuple: (raw_output, clean_code_output)
+    """
+    import time
+    
+    attempts = 0
+    output = None
+    
+    while attempts < max_attempts:
+        attempts += 1
+        try:
+            # Add a small delay before each attempt (only needed for retries)
+            if attempts > 1:
+                time.sleep(1)  # Small delay between retries
+                
+            # Invoke the chain
+            output = chain.invoke(
+                example_input,
+                config=dict(callbacks=callbacks) if callbacks else {}
+            )
+            
+            # Clean the code
+            clean_code_output = clean_code(output)
+            
+            # Only continue with retry if we got no usable output
+            if clean_code_output and len(clean_code_output) > min_code_length:
+                break
+                
+            print(f"Attempt {attempts}: Output too short or empty, retrying...")
+            
+        except Exception as e:
+            print(f"Error in attempt {attempts}: {str(e)}")
+            if attempts == max_attempts:
+                raise
+    
+    return output, clean_code_output
 
 
 def initialize_galileo_observer(project_name: str):
