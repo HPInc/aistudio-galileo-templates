@@ -155,6 +155,7 @@ def setup_accelerate():
 def deploy_model():
     setup_accelerate()
 
+    mlflow.set_tracking_uri('/phoenix/mlflow')
     mlflow.set_experiment("ImageGeneration")
     finetuned = "./dreambooth"
     base      = "../../../local/stable-diffusion-2-1"
