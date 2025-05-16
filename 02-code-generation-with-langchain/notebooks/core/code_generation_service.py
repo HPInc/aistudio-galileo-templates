@@ -41,6 +41,17 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection = None
         self.collection_name = "my_collection"
         self.embedding_path = None
+        
+        # Initialize a default embedding function
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+        except ImportError:
+            # Fall back to older import path
+            from langchain.embeddings import HuggingFaceEmbeddings
+            
+        self.embedding_function = HuggingFaceEmbeddings(
+            model_name="all-MiniLM-L6-v2"
+        )
     
     def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
         """
@@ -91,7 +102,8 @@ class CodeGenerationService(BaseGenerativeService):
         try:
             logger.info(f"Loading vector store from {persist_directory}")
             
-            # Check if embedding model was provided as an artifact
+            # Use the embedding function that was initialized in __init__
+            # Update it only if a specific path was provided as an artifact
             embedding_path = getattr(self, 'embedding_path', None)
             
             if embedding_path and os.path.exists(embedding_path):
@@ -104,22 +116,12 @@ class CodeGenerationService(BaseGenerativeService):
                     # Fall back to older import path
                     from langchain.embeddings import HuggingFaceEmbeddings
                 
-                # Load the model from the saved directory
-                embedding_function = HuggingFaceEmbeddings(model_name=embedding_path)
+                # Update the model from the saved directory
+                self.embedding_function = HuggingFaceEmbeddings(model_name=embedding_path)
                 logger.info("Embedding model loaded successfully from local path.")
             else:
-                # If no local path is available, initialize from Hugging Face hub
-                logger.info("No local embedding model path found. Downloading from Hugging Face hub...")
-                try:
-                    from langchain_huggingface import HuggingFaceEmbeddings
-                except ImportError:
-                    # Fall back to older import path
-                    from langchain.embeddings import HuggingFaceEmbeddings
-                
-                embedding_function = HuggingFaceEmbeddings(
-                    model_name="all-MiniLM-L6-v2"
-                )
-                logger.info("Embedding model downloaded and initialized from Hugging Face hub.")
+                # Use the embedding function that was already initialized in __init__
+                logger.info("Using embedding model initialized during service initialization.")
             
             # Initialize chromadb client
             client = chromadb.PersistentClient(path=persist_directory)
@@ -137,7 +139,7 @@ class CodeGenerationService(BaseGenerativeService):
             # Initialize LangChain vector store with the embedding function
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=embedding_function,
+                embedding_function=self.embedding_function,
                 collection_name=self.collection_name
             )
             self.retriever = self.vector_store.as_retriever()
@@ -146,18 +148,9 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Error loading vector store: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
-            # Create an empty vector store if loading fails
-            try:
-                from langchain_huggingface import HuggingFaceEmbeddings
-            except ImportError:
-                # Fall back to older import path
-                from langchain.embeddings import HuggingFaceEmbeddings
-            
-            # Fallback to a different model if the main one fails
-            embedding_function = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-mpnet-base-v2"
-            )
-            self.vector_store = Chroma(embedding_function=embedding_function)
+            # Use the embedding function that was already initialized in __init__
+            logger.info("Using embedding function initialized during service initialization for fallback.")
+            self.vector_store = Chroma(embedding_function=self.embedding_function)
             self.retriever = self.vector_store.as_retriever()
             logger.info("Created new empty vector store")
     
@@ -509,6 +502,18 @@ Question: {question}
         if "embedding_model" in context.artifacts:
             self.embedding_path = context.artifacts["embedding_model"]
             logger.info(f"Found embedding model artifact at {self.embedding_path}")
+            
+            # Update embedding function if a specific model path was provided
+            if self.embedding_path and os.path.exists(self.embedding_path):
+                logger.info(f"Initializing embedding model from artifact path: {self.embedding_path}")
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                    
+                self.embedding_function = HuggingFaceEmbeddings(model_name=self.embedding_path)
+                logger.info("Custom embedding model loaded successfully.")
         
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)

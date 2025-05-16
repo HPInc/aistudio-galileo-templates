@@ -54,7 +54,10 @@ class ChatbotService(BaseGenerativeService):
         """Initialize the chatbot service."""
         super().__init__()
         self.memory = []
-        self.embedding = None
+        self.embedding = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-mpnet-base-v2",
+            cache_folder="/tmp/hf_cache"
+        )
         self.vectordb = None
         self.retriever = None
         self.prompt_str = None
@@ -234,16 +237,7 @@ class ChatbotService(BaseGenerativeService):
             splits = text_splitter.split_documents(pdf_data)
             logger.info(f"PDF split into {len(splits)} parts.")
 
-            logger.info("Initializing embedding model...")
-            try:
-                self.embedding = HuggingFaceEmbeddings(
-                    model_name="sentence-transformers/all-mpnet-base-v2",
-                    cache_folder="/tmp/hf_cache"
-                )
-                logger.info("Embedding model loaded successfully.")
-            except Exception as emb_error:
-                logger.error(f"Error loading embedding model: {emb_error}")
-                raise
+            logger.info("Using embedding model initialized during service initialization.")
 
             # Create vector database
             logger.info("Creating vector database...")
@@ -281,7 +275,7 @@ class ChatbotService(BaseGenerativeService):
             input_normalizer
             | RunnableMap({
                 "context": retriever_runnable | format_docs_r,
-                "input": extract_input
+                "query": extract_input
             })
             | self.prompt
             | self.llm
@@ -345,9 +339,8 @@ class ChatbotService(BaseGenerativeService):
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
             new_splits = text_splitter.split_documents(pdf_data)
 
-            # Create a new vector database with the new document
-            embedding = HuggingFaceEmbeddings()
-            vectordb = Chroma.from_documents(documents=new_splits, embedding=embedding)
+            # Create a new vector database with the new document using the already initialized embedding model
+            vectordb = Chroma.from_documents(documents=new_splits, embedding=self.embedding)
             self.retriever = vectordb.as_retriever()
 
             # Clean up temporary file
