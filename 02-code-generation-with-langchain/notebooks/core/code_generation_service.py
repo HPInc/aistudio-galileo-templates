@@ -42,18 +42,16 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection_name = "my_collection"
         self.embedding_path = None
         
-        # Import the embedding module early
-        # but defer actual model creation until needed to save memory
+        # Initialize a default embedding function
         try:
             from langchain_huggingface import HuggingFaceEmbeddings
-            self._HuggingFaceEmbeddings = HuggingFaceEmbeddings
         except ImportError:
             # Fall back to older import path
             from langchain.embeddings import HuggingFaceEmbeddings
-            self._HuggingFaceEmbeddings = HuggingFaceEmbeddings
             
-        # Defer actual model initialization to save memory
-        self.embedding_function = None
+        self.embedding_function = HuggingFaceEmbeddings(
+            model_name="all-MiniLM-L6-v2"
+        )
     
     def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
         """
@@ -104,20 +102,26 @@ class CodeGenerationService(BaseGenerativeService):
         try:
             logger.info(f"Loading vector store from {persist_directory}")
             
-            # Initialize embedding function if it doesn't exist yet
-            if self.embedding_function is None:
-                embedding_path = getattr(self, 'embedding_path', None)
+            # Use the embedding function that was initialized in __init__
+            # Update it only if a specific path was provided as an artifact
+            embedding_path = getattr(self, 'embedding_path', None)
+            
+            if embedding_path and os.path.exists(embedding_path):
+                logger.info(f"Loading embedding model from local path: {embedding_path}")
                 
-                if embedding_path and os.path.exists(embedding_path):
-                    logger.info(f"Initializing embedding model from local path: {embedding_path}")
-                    # Use the class reference we saved in __init__
-                    self.embedding_function = self._HuggingFaceEmbeddings(model_name=embedding_path)
-                    logger.info("Embedding model loaded successfully from local path.")
-                else:
-                    logger.info("Initializing default embedding model")
-                    # Use the class reference we saved in __init__
-                    self.embedding_function = self._HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-                    logger.info("Default embedding model initialized.")
+                # Import here to avoid issues with imports in different environments
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                
+                # Update the model from the saved directory
+                self.embedding_function = HuggingFaceEmbeddings(model_name=embedding_path)
+                logger.info("Embedding model loaded successfully from local path.")
+            else:
+                # Use the embedding function that was already initialized in __init__
+                logger.info("Using embedding model initialized during service initialization.")
             
             # Initialize chromadb client
             client = chromadb.PersistentClient(path=persist_directory)
@@ -498,6 +502,18 @@ Question: {question}
         if "embedding_model" in context.artifacts:
             self.embedding_path = context.artifacts["embedding_model"]
             logger.info(f"Found embedding model artifact at {self.embedding_path}")
-
+            
+            # Update embedding function if a specific model path was provided
+            if self.embedding_path and os.path.exists(self.embedding_path):
+                logger.info(f"Initializing embedding model from artifact path: {self.embedding_path}")
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError:
+                    # Fall back to older import path
+                    from langchain.embeddings import HuggingFaceEmbeddings
+                    
+                self.embedding_function = HuggingFaceEmbeddings(model_name=self.embedding_path)
+                logger.info("Custom embedding model loaded successfully.")
+        
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
