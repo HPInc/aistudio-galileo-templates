@@ -54,10 +54,11 @@ class ChatbotService(BaseGenerativeService):
         """Initialize the chatbot service."""
         super().__init__()
         self.memory = []
-        self.embedding = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-mpnet-base-v2",
-            cache_folder="/tmp/hf_cache"
-        )
+        
+        # Import early but defer actual model creation to save memory
+        self._HuggingFaceEmbeddings = HuggingFaceEmbeddings
+        self.embedding = None 
+        
         self.vectordb = None
         self.retriever = None
         self.prompt_str = None
@@ -237,7 +238,14 @@ class ChatbotService(BaseGenerativeService):
             splits = text_splitter.split_documents(pdf_data)
             logger.info(f"PDF split into {len(splits)} parts.")
 
-            logger.info("Using embedding model initialized during service initialization.")
+            # Initialize embedding model if it doesn't exist yet
+            if self.embedding is None:
+                logger.info("Initializing embedding model")
+                self.embedding = self._HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/all-mpnet-base-v2",
+                    cache_folder="/tmp/hf_cache"
+                )
+                logger.info("Embedding model initialized successfully")
 
             # Create vector database
             logger.info("Creating vector database...")
@@ -339,7 +347,16 @@ class ChatbotService(BaseGenerativeService):
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
             new_splits = text_splitter.split_documents(pdf_data)
 
-            # Create a new vector database with the new document using the already initialized embedding model
+            # Make sure embedding model is initialized
+            if self.embedding is None:
+                logger.info("Initializing embedding model")
+                self.embedding = self._HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/all-mpnet-base-v2",
+                    cache_folder="/tmp/hf_cache"
+                )
+                logger.info("Embedding model initialized successfully")
+                
+            # Create a new vector database with the embedding model
             vectordb = Chroma.from_documents(documents=new_splits, embedding=self.embedding)
             self.retriever = vectordb.as_retriever()
 
