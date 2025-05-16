@@ -283,7 +283,7 @@ class ChatbotService(BaseGenerativeService):
             input_normalizer
             | RunnableMap({
                 "context": retriever_runnable | format_docs_r,
-                "input": extract_input
+                "query": extract_input
             })
             | self.prompt
             | self.llm
