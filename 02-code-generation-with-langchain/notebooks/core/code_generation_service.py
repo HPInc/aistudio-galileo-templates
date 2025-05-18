@@ -482,7 +482,7 @@ Question: {question}
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
     
-    def predict(self, context, model_input):
+    def predict(self, context, model_input: Dict[str, Any]) -> pd.DataFrame:
         """
         Generate code based on the input parameters.
         
@@ -494,7 +494,7 @@ Question: {question}
                            - "repository_url": GitHub repository URL (optional)
             
         Returns:
-            Dictionary with the generated code in a "result" field
+            DataFrame with the generated code in a "result" column
         """
         logger.info(f"Received model_input: {str(model_input)[:200]}...")
         
@@ -639,7 +639,7 @@ Question: {question}
         # Define model input/output schema with repository_url as optional parameter
         input_schema = Schema([
             ColSpec("string", "question"),
-            ColSpec("string", "repository_url", nullable=True)
+            ColSpec("string", "repository_url")
         ])
         output_schema = Schema([
             ColSpec("string", "result")
