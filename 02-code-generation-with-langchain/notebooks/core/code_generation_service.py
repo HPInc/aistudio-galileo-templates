@@ -56,6 +56,8 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection_name = "my_collection"
         self.embedding_path = None
         self.context_window = None
+        # Repository cache to avoid re-processing the same repositories
+        self.repository_cache = {}
         
         # Initialize a default embedding function
         try:
@@ -71,6 +73,7 @@ class CodeGenerationService(BaseGenerativeService):
     def extract_repository(self, repository_url: str) -> List[Dict[str, Any]]:
         """
         Extract code and metadata from a GitHub repository.
+        Uses a cache mechanism to avoid re-processing the same repository.
         
         Args:
             repository_url: URL of the GitHub repository
@@ -79,6 +82,23 @@ class CodeGenerationService(BaseGenerativeService):
             List of dictionaries containing extracted code and metadata
         """
         try:
+            # Check if repository is already in cache
+            if repository_url in self.repository_cache:
+                logger.info(f"Using cached data for repository: {repository_url}")
+                
+                # Update the collection reference from the cache
+                self.collection = self.repository_cache[repository_url]["collection"]
+                
+                # Check if the collection exists and has documents
+                if self.collection:
+                    try:
+                        count = self.collection.count()
+                        logger.info(f"Cache hit: Collection has {count} documents")
+                        return self.repository_cache[repository_url]["data"]
+                    except Exception as e:
+                        logger.warning(f"Cached collection error: {str(e)}. Re-processing repository.")
+                        # Continue with fresh processing if we can't access the cached collection
+            
             logger.info(f"Extracting code and metadata from repository: {repository_url}")
             
             # Step 1: Clone repository and extract files
@@ -149,6 +169,15 @@ class CodeGenerationService(BaseGenerativeService):
             
             # Update the collection reference
             self.collection = writer.collection
+            
+            # Store in cache for future use
+            import datetime
+            self.repository_cache[repository_url] = {
+                "data": updated_data,
+                "collection": self.collection,
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+            logger.info(f"Repository {repository_url} added to cache")
             
             return updated_data
         except Exception as e:
@@ -638,8 +667,8 @@ Question: {question}
         
         # Define model input/output schema with repository_url as optional parameter
         input_schema = Schema([
-            ColSpec("string", "question"),
-            ColSpec("string", "repository_url")
+            ColSpec("string", "question")
+            # repository_url is optional and will be handled in the predict method
         ])
         output_schema = Schema([
             ColSpec("string", "result")
