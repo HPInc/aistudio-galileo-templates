@@ -3,35 +3,48 @@ Code Generation Service implementation that extends the BaseGenerativeService.
 
 This service provides code generation capabilities using LLM models with vector retrieval
 and integrates with Galileo for protection, observation, and evaluation.
+It can extract context from GitHub repositories to enhance code generation responses.
 """
 
 import os
+import sys
 import logging
-from typing import Dict, Any, List
+import traceback
+from typing import Dict, Any, List, Optional
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.schema import StrOutputParser
+from langchain.schema import StrOutputParser, Document
 from langchain_community.llms import LlamaCpp
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
 from langchain.vectorstores import Chroma
-from langchain.schema import Document
 from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
 import chromadb
-
-# Import base service class from the shared location
-import sys
-import os
 
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
 
+# Add core directory to path for local imports
+core_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if core_path not in sys.path:
+    sys.path.append(core_path)
+
+# Import GitHub repository extraction tools
+from core.extract_text.github_repository_extractor import GitHubRepositoryExtractor
+from core.generate_metadata.llm_context_updater import LLMContextUpdater
+from core.dataflow.dataflow import EmbeddingUpdater, DataFrameConverter
+from core.vector_database.vector_store_writer import VectorStoreWriter
+
 # Set up logger
 logger = logging.getLogger(__name__)
 
 class CodeGenerationService(BaseGenerativeService):
-    """Code Generation Service that extends the BaseGenerativeService."""
+    """
+    Code Generation Service that extends the BaseGenerativeService.
+    Supports both direct code generation questions and
+    context retrieval from specified GitHub repositories.
+    """
 
     def __init__(self):
         """Initialize the code generation service."""
@@ -52,6 +65,95 @@ class CodeGenerationService(BaseGenerativeService):
         self.embedding_function = HuggingFaceEmbeddings(
             model_name="all-MiniLM-L6-v2"
         )
+    
+    def extract_repository(self, repository_url: str) -> List[Dict[str, Any]]:
+        """
+        Extract code and metadata from a GitHub repository.
+        
+        Args:
+            repository_url: URL of the GitHub repository
+            
+        Returns:
+            List of dictionaries containing extracted code and metadata
+        """
+        try:
+            logger.info(f"Extracting code and metadata from repository: {repository_url}")
+            
+            # Step 1: Clone repository and extract files
+            extractor = GitHubRepositoryExtractor(
+                repo_url=repository_url,
+                save_dir="./repo_files",
+                verbose=False,
+                max_file_size_kb=500,
+                max_chunk_size=100,
+                supported_extensions=('.py', '.ipynb', '.md', '.txt', '.json', '.js', '.ts')
+            )
+            extracted_data = extractor.run()
+            logger.info(f"Extracted {len(extracted_data)} code snippets from repository")
+            
+            # Step 2: Use LLM to generate metadata for each code snippet
+            # Create a template for metadata generation
+            template = """
+            You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
+
+            Code:
+            {code}
+
+            File name:
+            {filename}
+
+            Context:
+            {context}
+
+            Describe what the code above does.
+            """
+            
+            # Create the chain for generating metadata
+            from langchain_core.prompts import PromptTemplate
+            prompt = PromptTemplate.from_template(template)
+            
+            # Only use the LLM if it's been initialized
+            if self.llm:
+                logger.info("Using existing LLM model for metadata generation")
+                llm_chain = prompt | self.llm
+            else:
+                logger.warning("LLM not initialized, skipping metadata generation")
+                return extracted_data
+                
+            # Update contexts using LLM
+            updater = LLMContextUpdater(
+                llm_chain=llm_chain,
+                prompt_template=template,
+                verbose=False,
+                print_prompt=False
+            )
+            updated_data = updater.update(extracted_data)
+            logger.info("Metadata generation complete")
+            
+            # Step 3: Generate embeddings for each code snippet
+            embedding_updater = EmbeddingUpdater(embedding_model=self.embedding_function, verbose=False)
+            updated_data = embedding_updater.update(updated_data)
+            logger.info("Embeddings generated successfully")
+            
+            # Step 4: Convert to DataFrame for easier processing
+            converter = DataFrameConverter(verbose=False)
+            df = converter.to_dataframe(updated_data)
+            logger.info("Data conversion to DataFrame complete")
+            
+            # Step 5: Store in vector database
+            writer = VectorStoreWriter(collection_name=self.collection_name, verbose=False)
+            writer.upsert_dataframe(df)
+            logger.info(f"Repository data stored in collection: {self.collection_name}")
+            
+            # Update the collection reference
+            self.collection = writer.collection
+            
+            return updated_data
+        except Exception as e:
+            logger.error(f"Error extracting repository data: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
         """
@@ -77,10 +179,10 @@ class CodeGenerationService(BaseGenerativeService):
             
             documents = [
                 Document(
-                    page_content=str(results['documents'][i]),
-                    metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]
+                    page_content=str(results['documents'][0][i]),
+                    metadata=results['metadatas'][0][i] if isinstance(results['metadatas'][0][i], dict) else {}
                 )
-                for i in range(len(results['documents']))
+                for i in range(len(results['documents'][0]))
             ]
             
             logger.info(f"Retrieved {len(documents)} documents")
@@ -88,7 +190,6 @@ class CodeGenerationService(BaseGenerativeService):
         except Exception as e:
             logger.error(f"Error retrieving documents: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
@@ -102,39 +203,19 @@ class CodeGenerationService(BaseGenerativeService):
         try:
             logger.info(f"Loading vector store from {persist_directory}")
             
-            # Use the embedding function that was initialized in __init__
-            # Update it only if a specific path was provided as an artifact
-            embedding_path = getattr(self, 'embedding_path', None)
-            
-            if embedding_path and os.path.exists(embedding_path):
-                logger.info(f"Loading embedding model from local path: {embedding_path}")
-                
-                # Import here to avoid issues with imports in different environments
-                try:
-                    from langchain_huggingface import HuggingFaceEmbeddings
-                except ImportError:
-                    # Fall back to older import path
-                    from langchain.embeddings import HuggingFaceEmbeddings
-                
-                # Update the model from the saved directory
-                self.embedding_function = HuggingFaceEmbeddings(model_name=embedding_path)
-                logger.info("Embedding model loaded successfully from local path.")
-            else:
-                # Use the embedding function that was already initialized in __init__
-                logger.info("Using embedding model initialized during service initialization.")
-            
             # Initialize chromadb client
             client = chromadb.PersistentClient(path=persist_directory)
             
             # Try to get existing collection or create a new one
             try:
-                logger.info(f"Trying to get collection: {self.collection_name}")
-                self.collection = client.get_collection(name=self.collection_name)
-                logger.info(f"Collection '{self.collection_name}' found")
+                self.collection = client.get_or_create_collection(
+                    name=self.collection_name,
+                    embedding_function=self.embedding_function
+                )
+                logger.info(f"Collection '{self.collection_name}' loaded/created successfully")
             except Exception as col_err:
-                logger.info(f"Collection not found, creating new one: {str(col_err)}")
-                self.collection = client.create_collection(name=self.collection_name)
-                logger.info(f"Created new collection: {self.collection_name}")
+                logger.error(f"Error getting/creating collection: {str(col_err)}")
+                logger.error(f"Exception type: {type(col_err).__name__}")
             
             # Initialize LangChain vector store with the embedding function
             self.vector_store = Chroma(
@@ -149,7 +230,6 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
             # Use the embedding function that was already initialized in __init__
-            logger.info("Using embedding function initialized during service initialization for fallback.")
             self.vector_store = Chroma(embedding_function=self.embedding_function)
             self.retriever = self.vector_store.as_retriever()
             logger.info("Created new empty vector store")
@@ -166,22 +246,33 @@ class CodeGenerationService(BaseGenerativeService):
             logger.info(f"Attempting to load model from source: {model_source}")
             
             if model_source == "local":
-                logger.info("Using local LlamaCpp model source")
                 self.load_local_model(context)
             else:
-                error_msg = f"Unsupported model source: {model_source}. Currently only 'local' is supported for code generation."
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                logger.info(f"Using model source: {model_source}")
+                # Import utility function for initializing LLM
+                from src.utils import initialize_llm
+                
+                # Extract secrets from config
+                secrets = {}
+                if "secrets" in self.model_config:
+                    secrets = self.model_config["secrets"]
+                
+                # Get local model path from artifacts
+                local_model_path = None
+                if "models" in context.artifacts:
+                    local_model_path = context.artifacts["models"]
+                
+                # Initialize LLM using the utility function
+                self.llm = initialize_llm(model_source, secrets, local_model_path)
                 
             if self.llm is None:
-                logger.error("Model failed to initialize - llm is None after loading")
-                raise RuntimeError("Model initialization failed - llm is None")
+                logger.error("Failed to initialize model from any source")
+                raise ValueError("No model could be initialized")
                 
             logger.info(f"Model of type {type(self.llm).__name__} loaded successfully")
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
     
@@ -199,8 +290,8 @@ class CodeGenerationService(BaseGenerativeService):
             logger.info(f"Model path: {model_path}")
             
             if not model_path or not os.path.exists(model_path):
-                logger.error(f"Model file not found at: {model_path}")
-                raise FileNotFoundError(f"The model file was not found at: {model_path}")
+                logger.error(f"Model file not found at path: {model_path}")
+                raise FileNotFoundError(f"Model file not found: {model_path}")
             
             logger.info(f"Model file exists. Size: {os.path.getsize(model_path) / (1024 * 1024):.2f} MB")
             
@@ -218,19 +309,15 @@ class CodeGenerationService(BaseGenerativeService):
                     n_gpu_layers=30,
                     n_batch=512,
                     n_ctx=4096,
-                    max_tokens=1024,
                     f16_kv=True,
                     callback_manager=self.callback_manager,
-                    verbose=False,
-                    stop=[],
-                    streaming=False,
-                    temperature=0.2,
+                    verbose=True,
+                    max_tokens=1024,
+                    temperature=0.2
                 )
-                logger.info("LlamaCpp model initialized successfully.")
             except Exception as model_error:
                 logger.error(f"Failed to initialize LlamaCpp model: {str(model_error)}")
                 logger.error(f"Exception type: {type(model_error).__name__}")
-                import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 raise
                 
@@ -238,12 +325,40 @@ class CodeGenerationService(BaseGenerativeService):
         except Exception as e:
             logger.error(f"Error in load_local_model: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
     
     def load_prompt(self) -> None:
-        """Load the prompt template for code generation."""
+        """Load the prompt templates for code generation."""
+        # Template for code generation with repository context
+        self.code_description_template = """You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
+
+Code:
+{code}
+
+File name:
+{filename}
+
+Context:
+{context}
+
+Describe what the code above does.
+"""
+
+        # Template for direct code generation without repository context
+        self.code_generation_template = """You are a code generator AI that ONLY outputs working Python code.
+NEVER ask questions or request clarification.
+ALWAYS respond with complete, executable Python code.
+DO NOT include any explanations, comments, or non-code text.
+If you're uncertain about implementation details, make reasonable assumptions and provide working code.
+
+Context:
+{context}
+
+Task: {question}
+"""
+
+        # Default prompt for backward compatibility with existing chain structure
         self.prompt_str = """You are a Python wizard tasked with generating code for a Jupyter Notebook (.ipynb) based on the given context.
 Your answer should consist of just the Python code, without any additional text or explanation.
 
@@ -253,6 +368,10 @@ Context:
 Question: {question}
 """
         self.prompt = ChatPromptTemplate.from_template(self.prompt_str)
+        
+        # Create additional prompt objects
+        self.code_description_prompt = ChatPromptTemplate.from_template(self.code_description_template)
+        self.code_generation_prompt = ChatPromptTemplate.from_template(self.code_generation_template)
     
     def format_docs(self, docs: List[Document]) -> str:
         """
@@ -267,7 +386,7 @@ Question: {question}
         return "\n\n".join([doc.page_content for doc in docs])
     
     def load_chain(self) -> None:
-        """Create the code generation chain using the loaded model, prompt, and retriever."""
+        """Create the code generation chains using the loaded model, prompts, and retriever."""
         try:
             # Load the vector store first
             logger.info("Loading vector store for retrieval")
@@ -278,8 +397,9 @@ Question: {question}
                 logger.error("Neither collection nor retriever is initialized")
                 raise ValueError("A retrieval mechanism must be initialized before creating the chain")
                 
-            logger.info("Creating code generation chain")
-            # Create the chain using the custom_retriever function if collection is available,
+            logger.info("Creating code generation chains")
+            
+            # Create the standard chain using the custom_retriever function if collection is available,
             # otherwise fall back to the standard retriever
             if self.collection:
                 logger.info("Using direct collection querying for retrieval")
@@ -293,116 +413,147 @@ Question: {question}
                     "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["query"])),
                     "question": RunnablePassthrough()
                 } | self.prompt | self.llm | StrOutputParser()
-            logger.info("Code generation chain created successfully")
+                
+            # Create the specialized chain for repository-based code generation
+            logger.info("Creating repository-based code generation chain")
+            self.repository_chain = {
+                "context": lambda inputs: self.format_docs(self.custom_retriever(inputs["question"])),
+                "question": RunnablePassthrough()
+            } | self.code_generation_prompt | self.llm | StrOutputParser()
+            
+            # Create a direct code generation chain without repository context
+            logger.info("Creating direct code generation chain")
+            self.direct_chain = {
+                "context": lambda _: "",  # Empty context for direct questions
+                "question": RunnablePassthrough()
+            } | self.code_generation_prompt | self.llm | StrOutputParser()
+            
+            logger.info("Code generation chains created successfully")
         except Exception as e:
             logger.error(f"Error creating code generation chain: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
     
     def predict(self, context, model_input):
         """
-        Generate code based on the input question.
+        Generate code based on the input parameters.
         
         Args:
             context: MLflow model context
-            model_input: Input data for code generation, expecting either:
-                         - A direct dict with "question" field
-                         - A dict with "inputs" containing "question" or "query" fields
+            model_input: Input data for code generation, expecting:
+                         - A dict with "inputs" containing any of:
+                           - "question": User's code generation request (required)
+                           - "repository_url": GitHub repository URL (optional)
             
         Returns:
             Dictionary with the generated code in a "result" field
         """
         logger.info(f"Received model_input: {str(model_input)[:200]}...")
         
-        # Handle MLFlow API format where input is in {"inputs": {...}} format
+        # Extract input data from the MLFlow API format
         if "inputs" in model_input:
-            # Extract from the inputs wrapper
             input_data = model_input["inputs"]
         else:
-            # Direct input format
             input_data = model_input
-            
-        # Extract both query and question fields
-        query = ""
+        
+        # Extract fields from input data
         question = ""
+        repository_url = None
         
-        # Handle query field (used for retrieval)
-        if "query" in input_data:
-            if hasattr(input_data["query"], "iloc"):
-                query = input_data["query"].iloc[0] if not input_data["query"].empty else ""
-            else:
-                # Handle when it's a list (from API format) or a direct string
-                if isinstance(input_data["query"], list) and len(input_data["query"]) > 0:
-                    query = input_data["query"][0]
-                else:
-                    query = input_data["query"]
-        
-        # Handle question field (used for code generation prompt)
+        # Extract question field (required)
         if "question" in input_data:
             if hasattr(input_data["question"], "iloc"):
                 question = input_data["question"].iloc[0] if not input_data["question"].empty else ""
             else:
-                # Handle when it's a list (from API format) or a direct string
                 if isinstance(input_data["question"], list) and len(input_data["question"]) > 0:
                     question = input_data["question"][0]
                 else:
                     question = input_data["question"]
         
-        # Check if both fields are provided
-        if not query:
-            logger.warning("No query provided for code generation retrieval")
-            return pd.DataFrame([{"result": "Error: No query provided for code generation retrieval."}])
-            
+        # Extract repository_url field (optional)
+        if "repository_url" in input_data:
+            if hasattr(input_data["repository_url"], "iloc"):
+                repository_url = input_data["repository_url"].iloc[0] if not input_data["repository_url"].empty else None
+            else:
+                if isinstance(input_data["repository_url"], list) and len(input_data["repository_url"]) > 0:
+                    repository_url = input_data["repository_url"][0]
+                else:
+                    repository_url = input_data["repository_url"]
+        
+        # Check if question field is provided
         if not question:
-            logger.warning("No question provided for code generation prompt")
-            return pd.DataFrame([{"result": "Error: No question provided for code generation prompt."}])
+            logger.warning("No question provided for code generation")
+            return pd.DataFrame([{"result": "Error: No question provided for code generation."}])
         
         try:
-            logger.info(f"Processing code generation request with query: {str(query)[:30]}... and question: {str(question)[:50]}...")
-            # Log some info about the collection state
-            if self.collection:
-                try:
-                    count = self.collection.count()
-                    logger.info(f"Collection '{self.collection_name}' has {count} documents")
-                except Exception as count_error:
-                    logger.warning(f"Could not get collection count: {str(count_error)}")
+            logger.info(f"Processing code generation request for question: {str(question)[:50]}...")
             
-            # Create the input dictionary for the chain
-            chain_input = {"query": query, "question": question}
-            logger.info(f"Passing to chain: {chain_input}")
-            
-            # When using Galileo Protect, wrap the input in a custom format expected by Pydantic
-            if self.protect_tool is not None:
+            # If repository_url is provided, process it first
+            if repository_url:
+                logger.info(f"Repository URL provided: {repository_url}")
                 try:
-                    # First try with the original format (already wrapped as required by Galileo)
-                    result = self.protected_chain.invoke(
-                        {"input": chain_input, "output": ""}, 
+                    # Extract repository data and store it in vector database
+                    self.extract_repository(repository_url)
+                    
+                    # If we have data in the collection, use it for code generation
+                    if self.collection:
+                        try:
+                            count = self.collection.count()
+                            logger.info(f"Collection '{self.collection_name}' has {count} documents")
+                            
+                            # Use the repository chain with the question as both query and question
+                            chain_input = {"question": question}
+                            logger.info(f"Using repository chain with input: {chain_input}")
+                            
+                            # Process with repository context
+                            if self.protect_tool is not None:
+                                try:
+                                    result = self.repository_chain.invoke(
+                                        chain_input, 
+                                        config={"callbacks": [self.prompt_handler]}
+                                    )
+                                except Exception as protect_error:
+                                    logger.warning(f"Error with repository chain: {str(protect_error)}")
+                                    # Fall back to direct chain
+                                    result = self.direct_chain.invoke(
+                                        chain_input,
+                                        config={"callbacks": [self.prompt_handler]}
+                                    )
+                            else:
+                                result = self.repository_chain.invoke(
+                                    chain_input,
+                                    config={"callbacks": [self.prompt_handler]}
+                                )
+                        except Exception as count_error:
+                            logger.warning(f"Could not access collection: {str(count_error)}")
+                            # Fall back to direct generation
+                            result = self.direct_chain.invoke(
+                                {"question": question},
+                                config={"callbacks": [self.prompt_handler]}
+                            )
+                    else:
+                        # If no collection is available, fall back to direct generation
+                        logger.warning("No collection available, falling back to direct generation")
+                        result = self.direct_chain.invoke(
+                            {"question": question},
+                            config={"callbacks": [self.prompt_handler]}
+                        )
+                except Exception as repo_error:
+                    logger.error(f"Error processing repository: {str(repo_error)}")
+                    # Fall back to direct generation
+                    result = self.direct_chain.invoke(
+                        {"question": question},
                         config={"callbacks": [self.prompt_handler]}
                     )
-                except Exception as protect_error:
-                    logger.warning(f"Error with protected chain using input/output format: {str(protect_error)}")
-                    # Try additional wrapper format for Pydantic validation
-                    try:
-                        # Try with a different format as a fallback
-                        result = self.protected_chain.invoke(
-                            {"input": {"input": chain_input}, "output": {"output": ""}}, 
-                            config={"callbacks": [self.prompt_handler]}
-                        )
-                    except Exception as nested_error:
-                        logger.error(f"Both protection formats failed. Falling back to direct chain. Error: {str(nested_error)}")
-                        # Fallback to direct chain if all else fails
-                        result = self.chain.invoke(
-                            chain_input,
-                            config={"callbacks": [self.prompt_handler]}
-                        )
             else:
-                # Run the regular chain without Galileo Protect
-                result = self.chain.invoke(
-                    chain_input,
+                # Process the request using direct generation (no repository context)
+                logger.info("No repository URL provided, using direct code generation")
+                result = self.direct_chain.invoke(
+                    {"question": question},
                     config={"callbacks": [self.prompt_handler]}
                 )
+            
             logger.info("Code generation processed successfully")
             
             # Clean up the result (remove markdown code blocks if present)
@@ -413,7 +564,6 @@ Question: {question}
             error_message = f"Error processing code generation: {str(e)}"
             logger.error(error_message)
             logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return pd.DataFrame([{"result": error_message}])
     
@@ -439,10 +589,10 @@ Question: {question}
         
         logger = logging.getLogger(__name__)
         
-        # Define model input/output schema
+        # Define model input/output schema with repository_url as optional parameter
         input_schema = Schema([
-            ColSpec("string", "query"),
-            ColSpec("string", "question")
+            ColSpec("string", "question"),
+            ColSpec("string", "repository_url", nullable=True)
         ])
         output_schema = Schema([
             ColSpec("string", "result")
@@ -484,6 +634,7 @@ Question: {question}
                 "langchain_huggingface",
                 "langchain_community",
                 "sentence-transformers",
+                "gitpython",
                 "pyyaml"
             ]
         )
@@ -501,19 +652,22 @@ Question: {question}
         # Get the embedding model path from artifacts if available
         if "embedding_model" in context.artifacts:
             self.embedding_path = context.artifacts["embedding_model"]
-            logger.info(f"Found embedding model artifact at {self.embedding_path}")
+            logger.info(f"Found embedding model in artifacts: {self.embedding_path}")
             
-            # Update embedding function if a specific model path was provided
-            if self.embedding_path and os.path.exists(self.embedding_path):
-                logger.info(f"Initializing embedding model from artifact path: {self.embedding_path}")
-                try:
-                    from langchain_huggingface import HuggingFaceEmbeddings
-                except ImportError:
-                    # Fall back to older import path
-                    from langchain.embeddings import HuggingFaceEmbeddings
-                    
-                self.embedding_function = HuggingFaceEmbeddings(model_name=self.embedding_path)
-                logger.info("Custom embedding model loaded successfully.")
+            try:
+                from sentence_transformers import SentenceTransformer
+                logger.info(f"Loading embedding model from {self.embedding_path}")
+                model = SentenceTransformer(self.embedding_path)
+                
+                # Create a wrapper compatible with LangChain
+                from langchain_huggingface import HuggingFaceEmbeddings
+                self.embedding_function = HuggingFaceEmbeddings(
+                    model_name=self.embedding_path
+                )
+                logger.info("Embedding model loaded successfully")
+            except Exception as emb_error:
+                logger.error(f"Error loading embedding model: {str(emb_error)}")
+                logger.error("Falling back to default embedding model")
         
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
