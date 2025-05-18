@@ -24,6 +24,7 @@ import chromadb
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
+from src.utils import get_context_window, dynamic_retriever, format_docs_with_adaptive_context
 
 # Add core directory to path for local imports
 core_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -54,6 +55,7 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection = None
         self.collection_name = "my_collection"
         self.embedding_path = None
+        self.context_window = None
         
         # Initialize a default embedding function
         try:
@@ -155,35 +157,46 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
     
-    def custom_retriever(self, query: str, top_n: int = 10) -> List[Document]:
+    def custom_retriever(self, query: str, top_n: int = None) -> List[Document]:
         """
-        Custom retriever function
+        Custom retriever function 
         
         Args:
             query: The query string for retrieval
-            top_n: Number of documents to retrieve
+            top_n: Number of documents to retrieve (if None, determined by context window)
             
         Returns:
             List of Document objects with content and metadata
         """
-        if not self.collection:
-            logger.error("No collection available for retrieval")
+        
+        # Determine whether to use the vector_store or collection
+        retrieval_source = None
+        if self.vector_store:
+            logger.info("Using vector_store for retrieval")
+            retrieval_source = self.vector_store
+        elif self.collection:
+            logger.info("Using direct collection for retrieval")
+            retrieval_source = self.collection
+        else:
+            logger.error("No retrieval source available (neither vector_store nor collection)")
             return []
-            
+        
         try:
-            logger.info(f"Retrieving documents for query: {query[:30]}... (top {top_n})")
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=top_n
-            )
+            # Use class-level context window if available, or get from model
+            context_window = None
+            if hasattr(self, 'context_window') and self.context_window:
+                context_window = self.context_window
+                logger.info(f"Using stored context window: {context_window} tokens")
+            elif hasattr(self, 'llm'):
+                context_window = get_context_window(self.llm)
+                logger.info(f"Retrieved model context window: {context_window} tokens")
             
-            documents = [
-                Document(
-                    page_content=str(results['documents'][0][i]),
-                    metadata=results['metadatas'][0][i] if isinstance(results['metadatas'][0][i], dict) else {}
-                )
-                for i in range(len(results['documents'][0]))
-            ]
+            documents = dynamic_retriever(
+                query=query, 
+                collection=retrieval_source, 
+                top_n=top_n, 
+                context_window=context_window
+            )
             
             logger.info(f"Retrieved {len(documents)} documents")
             return documents
@@ -298,9 +311,19 @@ class CodeGenerationService(BaseGenerativeService):
             logger.info("Setting up callback manager")
             self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
             
+            # Determine optimal context window for this model using the utility function
+            from src.utils import get_model_context_window
+            
+            # Create a temporary model object with model_path attribute
+            temp_model = type('TempModel', (), {'model_path': model_path})
+            
+            # Get context window using the utility function (handles lookup in MODEL_CONTEXT_WINDOWS)
+            context_window = get_model_context_window(temp_model)
+            logger.info(f"Determined context window: {context_window} tokens")
+            
             logger.info("Initializing LlamaCpp with the following parameters:")
             logger.info(f"  - Model Path: {model_path}")
-            logger.info(f"  - n_gpu_layers: 30, n_batch: 512, n_ctx: 4096")
+            logger.info(f"  - n_gpu_layers: 30, n_batch: 512, n_ctx: {context_window}")
             logger.info(f"  - max_tokens: 1024, f16_kv: True, temperature: 0.2")
             
             try:
@@ -308,13 +331,16 @@ class CodeGenerationService(BaseGenerativeService):
                     model_path=model_path,
                     n_gpu_layers=30,
                     n_batch=512,
-                    n_ctx=4096,
+                    n_ctx=context_window,
                     f16_kv=True,
                     callback_manager=self.callback_manager,
                     verbose=True,
                     max_tokens=1024,
                     temperature=0.2
                 )
+                
+                self.llm.__dict__['_context_window'] = context_window
+                self.context_window = context_window
             except Exception as model_error:
                 logger.error(f"Failed to initialize LlamaCpp model: {str(model_error)}")
                 logger.error(f"Exception type: {type(model_error).__name__}")
@@ -373,16 +399,21 @@ Question: {question}
         self.code_description_prompt = ChatPromptTemplate.from_template(self.code_description_template)
         self.code_generation_prompt = ChatPromptTemplate.from_template(self.code_generation_template)
     
-    def format_docs(self, docs: List[Document]) -> str:
+    def format_docs(self, docs: List[Document], context_window: int = None) -> str:
         """
-        Format a list of documents into a single string.
+        Format a list of documents into a single string
         
         Args:
             docs: List of Document objects
+            context_window: Size of the model's context window in tokens (optional)
             
         Returns:
-            Formatted string of document contents
+            Formatted string of document contents optimized for the context window
         """
+        # Use the utility function if context window is provided
+        if context_window:
+            return format_docs_with_adaptive_context(docs, context_window=context_window)
+        # Fall back to simple concatenation if no context window info available
         return "\n\n".join([doc.page_content for doc in docs])
     
     def load_chain(self) -> None:
@@ -393,31 +424,47 @@ Question: {question}
             self.load_vector_store()
             
             # Verify retriever readiness using either direct collection or fallback to LangChain retriever
-            if not self.collection and not self.retriever:
-                logger.error("Neither collection nor retriever is initialized")
+            if not self.vector_store and not self.collection and not self.retriever:
+                logger.error("No retrieval mechanism available")
                 raise ValueError("A retrieval mechanism must be initialized before creating the chain")
                 
             logger.info("Creating code generation chains")
             
-            # Create the standard chain using the custom_retriever function if collection is available,
-            # otherwise fall back to the standard retriever
-            if self.collection:
-                logger.info("Using direct collection querying for retrieval")
-                self.chain = {
-                    "context": lambda inputs: self.format_docs(self.custom_retriever(inputs["query"])),
-                    "question": RunnablePassthrough()
-                } | self.prompt | self.llm | StrOutputParser()
-            else:
-                logger.info("Using LangChain retriever fallback")
-                self.chain = {
-                    "context": lambda inputs: self.format_docs(self.retriever.get_relevant_documents(inputs["query"])),
-                    "question": RunnablePassthrough()
-                } | self.prompt | self.llm | StrOutputParser()
+            # Use class-level context window if available, or retrieve from model
+            context_window = None
+            if hasattr(self, 'context_window') and self.context_window:
+                context_window = self.context_window
+                logger.info(f"Using stored context window: {context_window} tokens")
+            elif hasattr(self, 'llm'):
+                context_window = get_context_window(self.llm)
+                logger.info(f"Retrieved model context window: {context_window} tokens")
+            
+            # Create the context formatter function with adaptive formatting
+            def get_formatted_context(inputs):
+                # Get retrieval query (could be "query" or "question" depending on input)
+                query = inputs.get("query", inputs.get("question", ""))
+                
+                # Get documents using shared retriever
+                docs = self.custom_retriever(query)
+                
+                if not docs:
+                    logger.warning("No documents retrieved for query")
+                    return ""
+                    
+                # Format documents with adaptive context optimization
+                return format_docs_with_adaptive_context(docs, context_window=context_window)
+            
+            # Create the standard chain for general use
+            logger.info("Creating standard chain")
+            self.chain = {
+                "context": get_formatted_context,
+                "question": RunnablePassthrough()
+            } | self.prompt | self.llm | StrOutputParser()
                 
             # Create the specialized chain for repository-based code generation
             logger.info("Creating repository-based code generation chain")
             self.repository_chain = {
-                "context": lambda inputs: self.format_docs(self.custom_retriever(inputs["question"])),
+                "context": get_formatted_context,
                 "question": RunnablePassthrough()
             } | self.code_generation_prompt | self.llm | StrOutputParser()
             

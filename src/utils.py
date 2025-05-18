@@ -568,20 +568,48 @@ def dynamic_retriever(query: str, collection, top_n: int = None, context_window:
             # Default if we can't determine context window
             top_n = 3
 
-    # Get the most relevant documents
-    results = collection.query(
-        query_texts=[query],
-        n_results=top_n
-    )
-
-    # Convert to Document objects
-    documents = [
-        Document(
-            page_content=str(results['documents'][i]),
-            metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]  
+    # Check if collection is a Chroma vector store
+    if hasattr(collection, 'as_retriever'):
+        # It's a LangChain Chroma vector store
+        retriever = collection.as_retriever(search_kwargs={"k": top_n})
+        documents = retriever.get_relevant_documents(query)
+    elif hasattr(collection, '_collection'):
+        # It's a direct ChromaDB collection
+        results = collection._collection.query(
+            query_texts=[query],
+            n_results=top_n
         )
-        for i in range(len(results['documents']))
-    ]
+        
+        # Convert to Document objects
+        documents = [
+            Document(
+                page_content=str(results['documents'][0][i]),
+                metadata=results['metadatas'][0][i] if isinstance(results['metadatas'][0][i], dict) else results['metadatas'][0][i]
+            )
+            for i in range(len(results['documents'][0]))
+        ]
+    else:
+        # Try direct query as a fallback
+        try:
+            results = collection.query(
+                query_texts=[query],
+                n_results=top_n
+            )
+            
+            # Convert to Document objects
+            documents = [
+                Document(
+                    page_content=str(results['documents'][i]),
+                    metadata=results['metadatas'][i] if isinstance(results['metadatas'][i], dict) else results['metadatas'][i][0]  
+                )
+                for i in range(len(results['documents']))
+            ]
+        except AttributeError:
+            # If all else fails, raise a more helpful error
+            raise AttributeError(
+                "The collection object doesn't have required retrieval methods. "
+                "Expected a LangChain Chroma vector store or a ChromaDB collection."
+            )
 
     return documents
 
