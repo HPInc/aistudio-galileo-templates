@@ -48,7 +48,17 @@ class CodeGenerationService(BaseGenerativeService):
     """
 
     def __init__(self):
-        """Initialize the code generation service."""
+        """Initialize the code generation service.
+        
+        IMPORTANT: The embedding initialization order is critical - embeddings must be
+        initialized before any LLM model to prevent CUDA library loading issues
+        that may occur when initializing LlamaCpp models.
+        
+        To avoid downloading the default embedding model unnecessarily, the actual
+        embedding initialization is deferred until load_context is called, which
+        will check for an artifact model first. If rapid initialization is needed
+        before load_context is called, initialize_embedding_function can be called manually.
+        """
         super().__init__()
         self.vector_store = None
         self.retriever = None
@@ -58,17 +68,40 @@ class CodeGenerationService(BaseGenerativeService):
         self.context_window = None
         # Repository cache to avoid re-processing the same repositories
         self.repository_cache = {}
+        # The embedding_function will be initialized in load_context
+        # or can be manually initialized by calling initialize_embedding_function
+        self.embedding_function = None
+    
+    def initialize_embedding_function(self, embedding_model_path=None):
+        """Initialize the embedding function.
         
-        # Initialize a default embedding function
+        Args:
+            embedding_model_path: Path to a locally saved embedding model (optional)
+            
+        Returns:
+            An initialized HuggingFaceEmbeddings object
+        """
+        logger.info("Initializing embedding function")
+        
+        # Import HuggingFaceEmbeddings
         try:
             from langchain_huggingface import HuggingFaceEmbeddings
         except ImportError:
             # Fall back to older import path
             from langchain.embeddings import HuggingFaceEmbeddings
-            
-        self.embedding_function = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
+        
+        # Determine which model path to use
+        model_name = embedding_model_path if embedding_model_path else "all-MiniLM-L6-v2"
+        if embedding_model_path:
+            logger.info(f"Using provided embedding model path: {embedding_model_path}")
+        else:
+            logger.info("Using default embedding model: all-MiniLM-L6-v2")
+        
+        # Initialize the embedding function
+        self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
+        logger.info(f"Successfully initialized embedding function with model: {model_name}")
+        
+        return self.embedding_function
     
     def extract_repository(self, repository_url: str) -> List[Dict[str, Any]]:
         """
@@ -284,6 +317,23 @@ class CodeGenerationService(BaseGenerativeService):
             context: MLflow model context containing artifacts
         """
         try:
+            # Ensure embedding function is initialized before loading LLM (critical for CUDA library loading)
+            logger.info("Ensuring embedding model is initialized before loading LLM")
+            if hasattr(self, 'embedding_function') and self.embedding_function is not None:
+                logger.info("Using existing embedding function instance")
+            else:
+                logger.warning("Embedding function not initialized yet, initializing now")
+                # Try to use embedding model path from artifacts if available
+                embedding_model_path = None
+                if "embedding_model" in context.artifacts:
+                    embedding_model_path = context.artifacts["embedding_model"]
+                    if os.path.exists(embedding_model_path):
+                        logger.info(f"Using embedding model from artifacts: {embedding_model_path}")
+                
+                # Initialize embedding function
+                self.initialize_embedding_function(embedding_model_path)
+            
+            # Now proceed with loading the LLM model
             model_source = self.model_config.get("model_source", "local")
             logger.info(f"Attempting to load model from source: {model_source}")
             
@@ -352,13 +402,33 @@ class CodeGenerationService(BaseGenerativeService):
             
             logger.info("Initializing LlamaCpp with the following parameters:")
             logger.info(f"  - Model Path: {model_path}")
-            logger.info(f"  - n_gpu_layers: 30, n_batch: 512, n_ctx: {context_window}")
+            
+            # Check CUDA availability
+            cuda_available = False
+            try:
+                # Try to check if CUDA is available
+                import subprocess
+                try:
+                    subprocess.check_output(['ldconfig', '-p'], stderr=subprocess.STDOUT)
+                    libcuda_check = subprocess.check_output(['ldconfig', '-p', '|', 'grep', 'libcuda.so.1'], stderr=subprocess.STDOUT, shell=True)
+                    if libcuda_check:
+                        cuda_available = True
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    cuda_available = False
+            except Exception:
+                cuda_available = False
+                
+            logger.info(f"CUDA availability check: {'Available' if cuda_available else 'Not available'}")
+            
+            # Configure GPU layers based on CUDA availability
+            n_gpu_layers = 30 if cuda_available else 0
+            logger.info(f"  - n_gpu_layers: {n_gpu_layers}, n_batch: 512, n_ctx: {context_window}")
             logger.info(f"  - max_tokens: 1024, f16_kv: True, temperature: 0.2")
             
             try:
                 self.llm = LlamaCpp(
                     model_path=model_path,
-                    n_gpu_layers=30,
+                    n_gpu_layers=n_gpu_layers,
                     n_batch=512,
                     n_ctx=context_window,
                     f16_kv=True,
@@ -370,13 +440,12 @@ class CodeGenerationService(BaseGenerativeService):
                 
                 self.llm.__dict__['_context_window'] = context_window
                 self.context_window = context_window
+                logger.info(f"Using local LlamaCpp model for code generation with {'GPU' if cuda_available else 'CPU'} mode.")
             except Exception as model_error:
                 logger.error(f"Failed to initialize LlamaCpp model: {str(model_error)}")
                 logger.error(f"Exception type: {type(model_error).__name__}")
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 raise
-                
-            logger.info("Using local LlamaCpp model for code generation.")
         except Exception as e:
             logger.error(f"Error in load_local_model: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
@@ -653,6 +722,7 @@ Question: {question}
             config_path: Path to the configuration file
             model_path: Path to the LLM model file (optional)
             embedding_model_path: Path to the locally saved embedding model directory (optional)
+                                 If provided, will be used instead of downloading the model
             
         Returns:
             None
@@ -684,13 +754,14 @@ Question: {question}
         if model_path:
             artifacts["models"] = model_path
             
-        # Add embedding model to artifacts if path is provided
+        # Add embedding model path to artifacts if provided and exists
+        # This will allow us to use a locally saved model instead of downloading it during initialization
         if embedding_model_path and os.path.exists(embedding_model_path):
             artifacts["embedding_model"] = embedding_model_path
             logger.info(f"Using local embedding model from: {embedding_model_path}")
         else:
-            logger.warning("No local embedding model path provided or path doesn't exist. "
-                         "The service will download the model during initialization.")
+            logger.warning("No local embedding model path provided or path doesn't exist. " 
+                         "The service will download the embedding model during initialization.")
         
         # Log model to MLflow
         mlflow.pyfunc.log_model(
@@ -719,31 +790,35 @@ Question: {question}
     def load_context(self, context) -> None:
         """
         Load context for the model, including configuration, model, and chains.
-        This is an override of the BaseGenerativeService's load_context method to include
-        loading the embedding model from artifacts if available.
+        This is an override of the BaseGenerativeService's load_context method.
         
         Args:
             context: MLflow model context
         """
-        # Get the embedding model path from artifacts if available
+        # First, initialize the embedding function - will check for artifact model first
+        embedding_model_path = None
         if "embedding_model" in context.artifacts:
-            self.embedding_path = context.artifacts["embedding_model"]
-            logger.info(f"Found embedding model in artifacts: {self.embedding_path}")
-            
+            embedding_model_path = context.artifacts["embedding_model"]
+            if os.path.exists(embedding_model_path):
+                logger.info(f"Found saved embedding model in artifacts: {embedding_model_path}")
+            else:
+                logger.warning(f"Embedding model path provided in artifacts but not found: {embedding_model_path}")
+                embedding_model_path = None
+        
+        # Initialize the embedding function with the artifact path if available, otherwise use default
+        try:
+            self.initialize_embedding_function(embedding_model_path)
+        except Exception as e:
+            logger.warning(f"Failed to initialize embedding function: {str(e)}")
+            logger.warning("Will attempt to initialize default embedding model as fallback")
             try:
-                from sentence_transformers import SentenceTransformer
-                logger.info(f"Loading embedding model from {self.embedding_path}")
-                model = SentenceTransformer(self.embedding_path)
-                
-                # Create a wrapper compatible with LangChain
-                from langchain_huggingface import HuggingFaceEmbeddings
-                self.embedding_function = HuggingFaceEmbeddings(
-                    model_name=self.embedding_path
-                )
-                logger.info("Embedding model loaded successfully")
-            except Exception as emb_error:
-                logger.error(f"Error loading embedding model: {str(emb_error)}")
-                logger.error("Falling back to default embedding model")
+                self.initialize_embedding_function()
+            except Exception as e2:
+                logger.error(f"Failed to initialize default embedding model: {str(e2)}")
+                # Continue with initialization even if embedding fails - some functions might not need it
+        
+        # Call the parent load_context method to handle the rest of the initialization
+        super().load_context(context)
         
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
