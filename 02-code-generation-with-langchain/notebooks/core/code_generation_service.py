@@ -611,20 +611,14 @@ Question: {question}
             if hasattr(input_data["question"], "iloc"):
                 question = input_data["question"].iloc[0] if not input_data["question"].empty else ""
             else:
-                if isinstance(input_data["question"], list) and len(input_data["question"]) > 0:
-                    question = input_data["question"][0]
-                else:
-                    question = input_data["question"]
+                question = input_data["question"]
         
         # Extract repository_url field (optional)
         if "repository_url" in input_data:
             if hasattr(input_data["repository_url"], "iloc"):
                 repository_url = input_data["repository_url"].iloc[0] if not input_data["repository_url"].empty else None
             else:
-                if isinstance(input_data["repository_url"], list) and len(input_data["repository_url"]) > 0:
-                    repository_url = input_data["repository_url"][0]
-                else:
-                    repository_url = input_data["repository_url"]
+                repository_url = input_data["repository_url"]
         
         # Check if question field is provided
         if not question:
@@ -647,8 +641,8 @@ Question: {question}
                             count = self.collection.count()
                             logger.info(f"Collection '{self.collection_name}' has {count} documents")
                             
-                            # Use the repository chain with the question as both query and question
-                            chain_input = {"question": question}
+                            # Use the repository chain with the question
+                            chain_input = {"question": question, "query": question}
                             logger.info(f"Using repository chain with input: {chain_input}")
                             
                             # Process with repository context
@@ -737,8 +731,8 @@ Question: {question}
         
         # Define model input/output schema with repository_url as optional parameter
         input_schema = Schema([
-            ColSpec("string", "question")
-            # repository_url is optional and will be handled in the predict method
+            ColSpec("string", "question"),
+            ColSpec("string", "repository_url", required=False)  # Make repository_url explicitly optional in schema
         ])
         output_schema = Schema([
             ColSpec("string", "result")
