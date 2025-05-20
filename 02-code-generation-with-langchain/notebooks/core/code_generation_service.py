@@ -115,6 +115,8 @@ class CodeGenerationService(BaseGenerativeService):
             List of dictionaries containing extracted code and metadata
         """
         try:
+            self.reset_repository_state(repository_url)
+            
             # Check if repository is already in cache
             if repository_url in self.repository_cache:
                 logger.info(f"Using cached data for repository: {repository_url}")
@@ -619,6 +621,9 @@ Question: {question}
                 repository_url = input_data["repository_url"].iloc[0] if not input_data["repository_url"].empty else None
             else:
                 repository_url = input_data["repository_url"]
+        else:
+            logger.info("No repository_url provided, resetting repository state")
+            self.reset_repository_state()
         
         # Check if question field is provided
         if not question:
@@ -688,6 +693,8 @@ Question: {question}
             else:
                 # Process the request using direct generation (no repository context)
                 logger.info("No repository URL provided, using direct code generation")
+                # Ensure we're not using any previous repository state
+                self.reset_repository_state()
                 result = self.direct_chain.invoke(
                     {"question": question},
                     config={"callbacks": [self.prompt_handler]}
@@ -816,3 +823,33 @@ Question: {question}
         
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
+    
+    def reset_repository_state(self, repository_url=None):
+        """
+        Reset the repository state if no specific repository URL is provided.
+        
+        Args:
+            repository_url: If provided, keep this repository's data; otherwise, reset completely
+        """
+        if repository_url is None:
+            logger.info("Resetting active repository state - no repository URL provided")
+            self.collection = None
+            
+            # Reset vector store if possible
+            if hasattr(self, 'vector_store') and self.vector_store is not None:
+                try:
+                    logger.info("Attempting to reset vector store")
+                    # Create new empty vector store with the same embedding function
+                    if self.embedding_function is not None:
+                        self.vector_store = Chroma(embedding_function=self.embedding_function)
+                        self.retriever = self.vector_store.as_retriever()
+                        logger.info("Vector store reset successfully")
+                except Exception as e:
+                    logger.warning(f"Failed to reset vector store: {str(e)}")
+        else:
+            logger.info(f"Setting repository state for: {repository_url}")
+            # If repository is in cache, activate it
+            if repository_url in self.repository_cache:
+                logger.info(f"Repository {repository_url} found in cache, activating")
+                self.collection = self.repository_cache[repository_url]["collection"]
+            # Repository isn't in cache yet - it will be processed and added later
