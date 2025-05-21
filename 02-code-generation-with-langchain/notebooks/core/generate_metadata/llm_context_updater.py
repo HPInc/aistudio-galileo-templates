@@ -211,8 +211,9 @@ class LLMContextUpdater:
 
         # Process with timeout guard using concurrent.futures
         try:
+            # Invoke the LLM with the rendered prompt string, not the raw inputs dict
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.llm_chain.invoke, inputs)
+                future = executor.submit(self.llm_chain.invoke, rendered_prompt)
                 response = future.result(timeout=self.item_timeout)
                 
                 # Update the context with the LLM response
