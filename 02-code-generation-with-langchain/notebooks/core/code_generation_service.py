@@ -10,6 +10,7 @@ import os
 import sys
 import logging
 import traceback
+import time
 from typing import Dict, Any, List, Optional
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
@@ -24,7 +25,7 @@ import chromadb
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
-from src.utils import get_context_window, dynamic_retriever, format_docs_with_adaptive_context
+from src.utils import get_context_window, dynamic_retriever, format_docs_with_adaptive_context, clean_code
 
 # Add core directory to path for local imports
 core_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -66,9 +67,6 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection_name = "my_collection"
         self.embedding_path = None
         self.context_window = None
-        
-        # Import time module for timeout handling
-        import time
         
         # Repository cache to avoid re-processing the same repositories
         self.repository_cache = {}
@@ -137,7 +135,6 @@ class CodeGenerationService(BaseGenerativeService):
         Returns:
             List of dictionaries containing extracted code and metadata
         """
-        import time
         import concurrent.futures
         from functools import partial
         
@@ -951,16 +948,15 @@ Question: {question}
             
             logger.info("Code generation processed successfully")
             
-            # Clean up the result (remove markdown code blocks if present)
-            clean_code = result.replace("```python", "").replace("```", "").strip()
+            # Clean up the result using the imported clean_code utility function
+            clean_code_result = clean_code(result)
             
-            # Include processing info as a comment at the top of the generated code
-            # This helps with debugging and understanding how the code was generated
+            # Log processing info 
             import json
-            processing_info_str = f"# Generated with parameters: {json.dumps(processing_info)}"
-            final_code = f"{processing_info_str}\n\n{clean_code}"
+            logger.info(f"Processing info: {json.dumps(processing_info)}")
             
-            return pd.DataFrame([{"result": final_code}])
+            # Return only the clean code without any prefixes
+            return pd.DataFrame([{"result": clean_code_result}])
         except Exception as e:
             error_message = f"Error processing code generation: {str(e)}"
             logger.error(error_message)

@@ -319,9 +319,9 @@ def clean_code(result: str) -> str:
     """
     if not result or not isinstance(result, str):
         return ""
-    
-    # Remove common prefixes and wrapper text    
-    prefixes = ["Answer:", "Expected Answer:", "Python code:", "Here's the code:", "My Response:", "Response:"]
+
+    # Remove common prefixes and wrapper text
+    prefixes = ["Answer:", "Expected Answer:", "Expected Output:", "Python code:", "Here's the code:", "My Response:", "Response:"]
     for prefix in prefixes:
         if result.lstrip().startswith(prefix):
             result = result.replace(prefix, "", 1)
