@@ -12,20 +12,31 @@ This notebook implements a full Retrieval-Augmented Generation (RAG) pipeline fo
 
 ## Proect Struture
 ```
-├── requirements.txt                     # Dependency file for installing required packages
-├── README.md                            # Project overview and usage instructions
+├── demo/
+│   ├── main.py                         
+│   ├── poetry.lock                      
+│   ├── pyproject.toml                   
+│   └── README.md                       
+│
+├── docs/
+│   └── streamlit_sucess.png           
 │
 ├── notebooks/
-│   └── text-generation-with-langchain.ipynb   # Main notebook for generating scientific scripts using RAG
+│   └── text-generation-with-langchain.ipynb   
 │
 ├── core/
-│   ├── extract_text/
-│   │   └── arxiv_search.py              # Module to search and download papers from arXiv
 │   ├── analyzer/
-│   │   └── scientific_paper_analyzer.py # Analyzer that uses LLM and retriever to process the paper
+│   │   └── scientific_paper_analyzer.py 
+│   ├── deploy/
+│   │   └── text_generation_service.py   
+│   ├── extract_text/
+│   │   └── arxiv_search.py            
 │   └── generator/
-│       └── script_generator.py          # Class to manage section-by-section script generation
+│       └── script_generator.py          
 │
+├── README.md                          
+├── requirements.txt                     
+
 
 ```
 
