@@ -66,11 +66,30 @@ class CodeGenerationService(BaseGenerativeService):
         self.collection_name = "my_collection"
         self.embedding_path = None
         self.context_window = None
+        
+        # Import time module for timeout handling
+        import time
+        
         # Repository cache to avoid re-processing the same repositories
         self.repository_cache = {}
+        
         # The embedding_function will be initialized in load_context
         # or can be manually initialized by calling initialize_embedding_function
         self.embedding_function = None
+        
+        # Set default processing parameters
+        self.default_batch_size = 20
+        self.default_timeout = 300  # 5 minutes
+        
+        # Configure logging to reduce noise
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        
+        # Set logging format for better readability
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                formatter = logging.Formatter('[%(levelname)s] %(message)s')
+                handler.setFormatter(formatter)
     
     def initialize_embedding_function(self, embedding_model_path=None):
         """Initialize the embedding function.
@@ -103,17 +122,27 @@ class CodeGenerationService(BaseGenerativeService):
         
         return self.embedding_function
     
-    def extract_repository(self, repository_url: str) -> List[Dict[str, Any]]:
+    def extract_repository(self, repository_url: str, metadata_only: bool = False, 
+                          batch_size: int = 20, timeout: int = 300) -> List[Dict[str, Any]]:
         """
         Extract code and metadata from a GitHub repository.
         Uses a cache mechanism to avoid re-processing the same repository.
         
         Args:
             repository_url: URL of the GitHub repository
+            metadata_only: If True, only perform fast metadata extraction without LLM processing
+            batch_size: Number of files to process in each batch
+            timeout: Maximum time in seconds for the entire operation
             
         Returns:
             List of dictionaries containing extracted code and metadata
         """
+        import time
+        import concurrent.futures
+        from functools import partial
+        
+        start_time = time.time()
+        
         try:
             self.reset_repository_state(repository_url)
             
@@ -123,9 +152,10 @@ class CodeGenerationService(BaseGenerativeService):
                 
                 # Update the collection reference from the cache
                 self.collection = self.repository_cache[repository_url]["collection"]
+                metadata_status = self.repository_cache[repository_url].get("metadata_only", False)
                 
-                # Check if the collection exists and has documents
-                if self.collection:
+                # If we want full processing but the cache only has metadata, we need to process further
+                if metadata_only or not metadata_status:
                     try:
                         count = self.collection.count()
                         logger.info(f"Cache hit: Collection has {count} documents")
@@ -134,7 +164,7 @@ class CodeGenerationService(BaseGenerativeService):
                         logger.warning(f"Cached collection error: {str(e)}. Re-processing repository.")
                         # Continue with fresh processing if we can't access the cached collection
             
-            logger.info(f"Extracting code and metadata from repository: {repository_url}")
+            logger.info(f"Extracting code from repository: {repository_url} (metadata_only={metadata_only})")
             
             # Step 1: Clone repository and extract files
             extractor = GitHubRepositoryExtractor(
@@ -146,80 +176,225 @@ class CodeGenerationService(BaseGenerativeService):
                 supported_extensions=('.py', '.ipynb', '.md', '.txt', '.json', '.js', '.ts')
             )
             extracted_data = extractor.run()
-            logger.info(f"Extracted {len(extracted_data)} code snippets from repository")
+            file_count = len(extracted_data)
+            logger.info(f"Extracted {file_count} code snippets from repository")
             
-            # Step 2: Use LLM to generate metadata for each code snippet
-            # Create a template for metadata generation
-            template = """
-            You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
-
-            Code:
-            {code}
-
-            File name:
-            {filename}
-
-            Context:
-            {context}
-
-            Describe what the code above does.
-            """
+            # Check timeout after extraction
+            if (time.time() - start_time) > timeout:
+                logger.warning("Repository extraction timeout reached. Returning partial results.")
+                return self._store_partial_results(repository_url, extracted_data, metadata_only=True)
             
-            # Create the chain for generating metadata
-            from langchain_core.prompts import PromptTemplate
-            prompt = PromptTemplate.from_template(template)
-            
-            # Only use the LLM if it's been initialized
-            if self.llm:
-                logger.info("Using existing LLM model for metadata generation")
-                llm_chain = prompt | self.llm
+            # For metadata_only mode, skip LLM processing and just add basic metadata
+            if metadata_only:
+                logger.info("Metadata-only mode: Skipping LLM context generation")
+                # Add basic metadata to each file
+                for item in extracted_data:
+                    filename = item.get('filename', 'unknown_file')
+                    # Generate basic metadata based on file extension and size
+                    extension = os.path.splitext(filename)[1] if '.' in filename else ''
+                    code_size = len(item.get('code', ''))
+                    item['context'] = f"File: {filename} ({extension} file, {code_size} characters)"
+                    
+                # Skip to embeddings generation
+                updated_data = extracted_data
             else:
-                logger.warning("LLM not initialized, skipping metadata generation")
-                return extracted_data
+                # Step 2: Use LLM to generate metadata for each code snippet with batching
+                from langchain_core.prompts import PromptTemplate
+                template = """
+                You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
+
+                Code:
+                {code}
+
+                File name:
+                {filename}
+
+                Context:
+                {context}
+
+                Describe what the code above does.
+                """
                 
-            # Update contexts using LLM
-            updater = LLMContextUpdater(
-                llm_chain=llm_chain,
-                prompt_template=template,
-                verbose=False,
-                print_prompt=False
-            )
-            updated_data = updater.update(extracted_data)
-            logger.info("Metadata generation complete")
+                prompt = PromptTemplate.from_template(template)
+                
+                # Only use the LLM if it's been initialized
+                if self.llm:
+                    logger.info("Using existing LLM model for metadata generation")
+                    llm_chain = prompt | self.llm
+                else:
+                    logger.warning("LLM not initialized, skipping metadata generation")
+                    return self._store_partial_results(repository_url, extracted_data, metadata_only=True)
+                
+                # Process files in batches to avoid memory issues
+                updated_data = []
+                total_batches = (file_count + batch_size - 1) // batch_size  # ceil division
+                
+                for batch_idx in range(total_batches):
+                    # Check timeout before each batch
+                    if (time.time() - start_time) > timeout:
+                        logger.warning(f"Timeout reached after processing {batch_idx}/{total_batches} batches")
+                        # Store what we have so far
+                        if updated_data:
+                            updated_data.extend(extracted_data[len(updated_data):])
+                        else:
+                            updated_data = extracted_data
+                        return self._store_partial_results(repository_url, updated_data, metadata_only=True)
+                    
+                    batch_start = batch_idx * batch_size
+                    batch_end = min((batch_idx + 1) * batch_size, file_count)
+                    current_batch = extracted_data[batch_start:batch_end]
+                    
+                    logger.info(f"Processing batch {batch_idx+1}/{total_batches} ({len(current_batch)} files)")
+                    
+                    try:
+                        # Set a batch timeout that's a fraction of the total timeout
+                        batch_timeout = min(30, timeout // total_batches)
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            batch_future = executor.submit(self._process_metadata_batch, 
+                                                          current_batch, llm_chain, template)
+                            batch_result = batch_future.result(timeout=batch_timeout)
+                            updated_data.extend(batch_result)
+                    except concurrent.futures.TimeoutError:
+                        logger.warning(f"Batch {batch_idx+1} processing timed out after {batch_timeout}s")
+                        # Add the unprocessed items from this batch with basic metadata
+                        for item in current_batch:
+                            filename = item.get('filename', 'unknown_file')
+                            item['context'] = f"File: {filename} (metadata generation timed out)"
+                            updated_data.append(item)
+                    except Exception as batch_error:
+                        logger.error(f"Error processing batch {batch_idx+1}: {str(batch_error)}")
+                        # Add the unprocessed items from this batch with basic metadata
+                        for item in current_batch:
+                            filename = item.get('filename', 'unknown_file')
+                            item['context'] = f"File: {filename} (metadata generation failed)"
+                            updated_data.append(item)
+            
+            # Check timeout again before embedding generation
+            if (time.time() - start_time) > timeout * 0.9:  # 90% of timeout
+                logger.warning("Approaching timeout limit. Skipping embedding generation.")
+                return self._store_partial_results(repository_url, updated_data, metadata_only=True)
             
             # Step 3: Generate embeddings for each code snippet
-            embedding_updater = EmbeddingUpdater(embedding_model=self.embedding_function, verbose=False)
-            updated_data = embedding_updater.update(updated_data)
-            logger.info("Embeddings generated successfully")
+            try:
+                embedding_updater = EmbeddingUpdater(embedding_model=self.embedding_function, verbose=False)
+                updated_data = embedding_updater.update(updated_data)
+                logger.info("Embeddings generated successfully")
+            except Exception as e:
+                logger.error(f"Error during embedding generation: {str(e)}")
+                # Continue with the process, just log the error
             
             # Step 4: Convert to DataFrame for easier processing
-            converter = DataFrameConverter(verbose=False)
-            df = converter.to_dataframe(updated_data)
-            logger.info("Data conversion to DataFrame complete")
+            try:
+                converter = DataFrameConverter(verbose=False)
+                df = converter.to_dataframe(updated_data)
+                logger.info("Data conversion to DataFrame complete")
+            except Exception as e:
+                logger.error(f"Error during DataFrame conversion: {str(e)}")
+                # Create a basic DataFrame with just the essential fields
+                import pandas as pd
+                basic_data = []
+                for item in updated_data:
+                    basic_data.append({
+                        'id': item.get('id', f"id_{len(basic_data)}"),
+                        'code': item.get('code', ''),
+                        'filename': item.get('filename', 'unknown'),
+                        'context': item.get('context', ''),
+                        'embedding': item.get('embedding', [])
+                    })
+                df = pd.DataFrame(basic_data)
+                logger.info("Created basic DataFrame with essential fields")
             
             # Step 5: Store in vector database
-            writer = VectorStoreWriter(collection_name=self.collection_name, verbose=False)
-            writer.upsert_dataframe(df)
-            logger.info(f"Repository data stored in collection: {self.collection_name}")
-            
-            # Update the collection reference
-            self.collection = writer.collection
+            try:
+                writer = VectorStoreWriter(collection_name=self.collection_name, verbose=False)
+                writer.upsert_dataframe(df)
+                logger.info(f"Repository data stored in collection: {self.collection_name}")
+                
+                # Update the collection reference
+                self.collection = writer.collection
+            except Exception as e:
+                logger.error(f"Error storing data in vector database: {str(e)}")
+                # If we can't store in the database, return what we have without caching
+                return updated_data
             
             # Store in cache for future use
             import datetime
             self.repository_cache[repository_url] = {
                 "data": updated_data,
                 "collection": self.collection,
-                "timestamp": datetime.datetime.now().isoformat()
+                "timestamp": datetime.datetime.now().isoformat(),
+                "metadata_only": metadata_only
             }
-            logger.info(f"Repository {repository_url} added to cache")
+            logger.info(f"Repository {repository_url} added to cache (metadata_only={metadata_only})")
             
             return updated_data
         except Exception as e:
             logger.error(f"Error extracting repository data: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Traceback: {traceback.format_exc()}")
-            raise
+            # Return empty list instead of raising, to allow graceful degradation
+            return []
+    
+    def _process_metadata_batch(self, batch, llm_chain, template):
+        """Process a batch of files to generate metadata."""
+        try:
+            updater = LLMContextUpdater(
+                llm_chain=llm_chain,
+                prompt_template=template,
+                verbose=False,
+                print_prompt=False
+            )
+            return updater.update(batch)
+        except Exception as e:
+            logger.error(f"Error in batch metadata processing: {str(e)}")
+            # Return batch with basic context information for resilience
+            for item in batch:
+                if 'context' not in item or not item['context']:
+                    filename = item.get('filename', 'unknown_file')
+                    item['context'] = f"File: {filename} (metadata generation failed)"
+            return batch
+    
+    def _store_partial_results(self, repository_url, data, metadata_only=True):
+        """Store partial results in cache and vector database."""
+        try:
+            # Add basic embeddings if missing
+            for item in data:
+                if 'embedding' not in item or not item['embedding']:
+                    # Create a small random vector as placeholder
+                    import numpy as np
+                    item['embedding'] = np.random.rand(384).tolist()  # 384 is the dimension for all-MiniLM-L6-v2
+            
+            # Convert to DataFrame
+            import pandas as pd
+            df = pd.DataFrame([{
+                'id': item.get('id', f"id_{i}"),
+                'code': item.get('code', ''),
+                'filename': item.get('filename', 'unknown'),
+                'context': item.get('context', ''),
+                'embedding': item.get('embedding', [])
+            } for i, item in enumerate(data)])
+            
+            # Store in vector database
+            writer = VectorStoreWriter(collection_name=self.collection_name, verbose=False)
+            writer.upsert_dataframe(df)
+            
+            # Update the collection reference and cache
+            self.collection = writer.collection
+            
+            # Store in cache for future use
+            import datetime
+            self.repository_cache[repository_url] = {
+                "data": data,
+                "collection": self.collection,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "metadata_only": metadata_only
+            }
+            logger.info(f"Stored partial results for {repository_url} (metadata_only={metadata_only})")
+            
+            return data
+        except Exception as e:
+            logger.error(f"Error storing partial results: {str(e)}")
+            return data
     
     def custom_retriever(self, query: str, top_n: int = None) -> List[Document]:
         """
@@ -592,10 +767,17 @@ Question: {question}
                          - A dict with "inputs" containing any of:
                            - "question": User's code generation request (required)
                            - "repository_url": GitHub repository URL (optional)
+                           - "metadata_only": Process only metadata without full LLM analysis (optional, default: False)
+                           - "process_timeout": Maximum time for repository processing in seconds (optional, default: 300)
+                           - "batch_size": Number of files to process in each batch (optional, default: 20)
             
         Returns:
             DataFrame with the generated code in a "result" column
         """
+        # Set reasonable logging levels to reduce clutter
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        
         logger.info(f"Received model_input: {str(model_input)[:200]}...")
         
         # Extract input data from the MLFlow API format
@@ -604,9 +786,12 @@ Question: {question}
         else:
             input_data = model_input
         
-        # Extract fields from input data
+        # Extract main fields from input data
         question = ""
         repository_url = None
+        metadata_only = False
+        process_timeout = 300  # Default 5 minutes
+        batch_size = 20  # Default batch size for repository processing
         
         # Extract question field (required)
         if "question" in input_data:
@@ -625,6 +810,35 @@ Question: {question}
             logger.info("No repository_url provided, resetting repository state")
             self.reset_repository_state()
         
+        # Extract metadata_only parameter (optional)
+        if "metadata_only" in input_data:
+            if hasattr(input_data["metadata_only"], "iloc"):
+                metadata_only = input_data["metadata_only"].iloc[0] if not input_data["metadata_only"].empty else False
+            else:
+                metadata_only = bool(input_data["metadata_only"])
+        
+        # Extract process_timeout parameter (optional)
+        if "process_timeout" in input_data:
+            try:
+                if hasattr(input_data["process_timeout"], "iloc"):
+                    process_timeout = int(input_data["process_timeout"].iloc[0]) if not input_data["process_timeout"].empty else 300
+                else:
+                    process_timeout = int(input_data["process_timeout"])
+            except (ValueError, TypeError):
+                logger.warning("Invalid process_timeout value, using default (300 seconds)")
+                process_timeout = 300
+        
+        # Extract batch_size parameter (optional)
+        if "batch_size" in input_data:
+            try:
+                if hasattr(input_data["batch_size"], "iloc"):
+                    batch_size = int(input_data["batch_size"].iloc[0]) if not input_data["batch_size"].empty else 20
+                else:
+                    batch_size = int(input_data["batch_size"])
+            except (ValueError, TypeError):
+                logger.warning("Invalid batch_size value, using default (20)")
+                batch_size = 20
+        
         # Check if question field is provided
         if not question:
             logger.warning("No question provided for code generation")
@@ -632,13 +846,22 @@ Question: {question}
         
         try:
             logger.info(f"Processing code generation request for question: {str(question)[:50]}...")
+            logger.info(f"Parameters: metadata_only={metadata_only}, timeout={process_timeout}s, batch_size={batch_size}")
             
             # If repository_url is provided, process it first
             if repository_url:
                 logger.info(f"Repository URL provided: {repository_url}")
                 try:
-                    # Extract repository data and store it in vector database
-                    self.extract_repository(repository_url)
+                    # Extract repository data with the specified parameters
+                    start_time = time.time()
+                    self.extract_repository(
+                        repository_url, 
+                        metadata_only=metadata_only,
+                        timeout=process_timeout,
+                        batch_size=batch_size
+                    )
+                    processing_time = time.time() - start_time
+                    logger.info(f"Repository processing completed in {processing_time:.2f} seconds")
                     
                     # If we have data in the collection, use it for code generation
                     if self.collection:
@@ -651,45 +874,70 @@ Question: {question}
                             logger.info(f"Using repository chain with input: {chain_input}")
                             
                             # Process with repository context
-                            if self.protect_tool is not None:
+                            if hasattr(self, 'protect_tool') and self.protect_tool is not None:
                                 try:
                                     result = self.repository_chain.invoke(
                                         chain_input, 
-                                        config={"callbacks": [self.prompt_handler]}
+                                        config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                                     )
                                 except Exception as protect_error:
                                     logger.warning(f"Error with repository chain: {str(protect_error)}")
                                     # Fall back to direct chain
                                     result = self.direct_chain.invoke(
                                         chain_input,
-                                        config={"callbacks": [self.prompt_handler]}
+                                        config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                                     )
                             else:
                                 result = self.repository_chain.invoke(
                                     chain_input,
-                                    config={"callbacks": [self.prompt_handler]}
+                                    config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                                 )
+                            
+                            # Include repository processing info in response for observability
+                            processing_info = {
+                                "processing_time_seconds": processing_time,
+                                "metadata_only": metadata_only,
+                                "document_count": count,
+                                "repository_url": repository_url
+                            }
                         except Exception as count_error:
                             logger.warning(f"Could not access collection: {str(count_error)}")
                             # Fall back to direct generation
                             result = self.direct_chain.invoke(
                                 {"question": question},
-                                config={"callbacks": [self.prompt_handler]}
+                                config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                             )
+                            processing_info = {
+                                "processing_time_seconds": processing_time,
+                                "metadata_only": metadata_only,
+                                "error": "collection_access_failed",
+                                "repository_url": repository_url
+                            }
                     else:
                         # If no collection is available, fall back to direct generation
                         logger.warning("No collection available, falling back to direct generation")
                         result = self.direct_chain.invoke(
                             {"question": question},
-                            config={"callbacks": [self.prompt_handler]}
+                            config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                         )
+                        processing_info = {
+                            "processing_time_seconds": processing_time,
+                            "metadata_only": metadata_only,
+                            "error": "no_collection_created",
+                            "repository_url": repository_url
+                        }
                 except Exception as repo_error:
                     logger.error(f"Error processing repository: {str(repo_error)}")
                     # Fall back to direct generation
                     result = self.direct_chain.invoke(
                         {"question": question},
-                        config={"callbacks": [self.prompt_handler]}
+                        config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                     )
+                    processing_info = {
+                        "error": f"repository_processing_failed: {str(repo_error)[:100]}",
+                        "repository_url": repository_url,
+                        "metadata_only": metadata_only
+                    }
             else:
                 # Process the request using direct generation (no repository context)
                 logger.info("No repository URL provided, using direct code generation")
@@ -697,21 +945,28 @@ Question: {question}
                 self.reset_repository_state()
                 result = self.direct_chain.invoke(
                     {"question": question},
-                    config={"callbacks": [self.prompt_handler]}
+                    config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
                 )
+                processing_info = {"mode": "direct_generation"}
             
             logger.info("Code generation processed successfully")
             
             # Clean up the result (remove markdown code blocks if present)
             clean_code = result.replace("```python", "").replace("```", "").strip()
             
-            return pd.DataFrame([{"result": clean_code}])
+            # Include processing info as a comment at the top of the generated code
+            # This helps with debugging and understanding how the code was generated
+            import json
+            processing_info_str = f"# Generated with parameters: {json.dumps(processing_info)}"
+            final_code = f"{processing_info_str}\n\n{clean_code}"
+            
+            return pd.DataFrame([{"result": final_code}])
         except Exception as e:
             error_message = f"Error processing code generation: {str(e)}"
             logger.error(error_message)
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Traceback: {traceback.format_exc()}")
-            return pd.DataFrame([{"result": error_message}])
+            return pd.DataFrame([{"result": f"# Error during processing\n# {error_message}\n\n# Falling back to basic response\n\n# Your question was: {question}\n\n# Please try again with metadata_only=True or a smaller repository"}])
     
     @classmethod
     def log_model(cls, secrets_path, config_path, model_path=None, embedding_model_path=None):
@@ -736,10 +991,13 @@ Question: {question}
         
         logger = logging.getLogger(__name__)
         
-        # Define model input/output schema with repository_url as optional parameter
+        # Define model input/output schema with all parameters
         input_schema = Schema([
             ColSpec("string", "question"),
-            ColSpec("string", "repository_url", required=False)  # Make repository_url explicitly optional in schema
+            ColSpec("string", "repository_url", required=False),  # Optional repository URL
+            ColSpec("boolean", "metadata_only", required=False),  # Optional metadata-only flag
+            ColSpec("long", "process_timeout", required=False),   # Optional process timeout in seconds
+            ColSpec("long", "batch_size", required=False)         # Optional batch size
         ])
         output_schema = Schema([
             ColSpec("string", "result")
