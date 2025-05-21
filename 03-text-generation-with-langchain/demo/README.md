@@ -14,7 +14,7 @@ python -m poetry install
 ## 3. Launch the Streamlit Web App
 Still in the project's root directory, start the Streamlit app by running:
 ```bash
-python -m poetry run streamlit run "ui_streamlit.py"
+python -m poetry run streamlit run "main.py"
 ```
 
 ## 4. Select the Correct API Endpoint When Using the App
