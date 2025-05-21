@@ -53,7 +53,7 @@ class CodeGenerationService(BaseGenerativeService):
     context retrieval from specified GitHub repositories.
     """
 
-    def __init__(self):
+    def __init__(self, delay_async_init=False):
         """Initialize the code generation service.
         
         IMPORTANT: The embedding initialization order is critical - embeddings must be
@@ -64,6 +64,10 @@ class CodeGenerationService(BaseGenerativeService):
         embedding initialization is deferred until load_context is called, which
         will check for an artifact model first. If rapid initialization is needed
         before load_context is called, initialize_embedding_function can be called manually.
+        
+        Args:
+            delay_async_init: If True, delay initialization of thread-based components
+                             to allow pickling the model for MLflow serialization
         """
         super().__init__()
         self.vector_store = None
@@ -85,8 +89,12 @@ class CodeGenerationService(BaseGenerativeService):
         self.default_timeout = 300  # 5 minutes
         
         # Initialize status tracker and async repository processor
-        self.repository_status_tracker = RepositoryStatusTracker()
-        self.repository_processor = None  # Will be initialized when required components are available
+        if not delay_async_init:
+            self._initialize_async_components()
+        else:
+            # Don't initialize the thread-based components during MLflow serialization
+            self.repository_status_tracker = None
+            self.repository_processor = None
         
         # Configure logging to reduce noise
         logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -98,6 +106,24 @@ class CodeGenerationService(BaseGenerativeService):
                 formatter = logging.Formatter('[%(levelname)s] %(message)s')
                 handler.setFormatter(formatter)
     
+    def _initialize_async_components(self):
+        """
+        Initialize the asynchronous repository processing components.
+        This method is separated to allow MLflow serialization without thread locks.
+        """
+        try:
+            # Initialize the repository status tracker
+            self.repository_status_tracker = RepositoryStatusTracker()
+            
+            # Repository processor will be initialized when needed
+            self.repository_processor = None
+            
+            logger.info("Async repository processing components initialized")
+        except Exception as e:
+            logger.warning(f"Error initializing async components: {str(e)}")
+            self.repository_status_tracker = None
+            self.repository_processor = None
+
     def initialize_embedding_function(self, embedding_model_path=None):
         """Initialize the embedding function.
         
@@ -1111,7 +1137,7 @@ Question: {question}
             return pd.DataFrame([{"result": f"# Error during processing\n# {error_message}\n\n# Falling back to basic response\n\n# Your question was: {question}\n\n# Please try again with metadata_only=True or a smaller repository"}])
     
     @classmethod
-    def log_model(cls, secrets_path, config_path, model_path=None, embedding_model_path=None):
+    def log_model(cls, secrets_path, config_path, model_path=None, embedding_model_path=None, delay_async_init=True):
         """
         Log the model to MLflow.
         
@@ -1121,6 +1147,8 @@ Question: {question}
             model_path: Path to the LLM model file (optional)
             embedding_model_path: Path to the locally saved embedding model directory (optional)
                                  If provided, will be used instead of downloading the model
+            delay_async_init: If True, delay thread-based component initialization during serialization (default: True)
+                             to prevent MLflow serialization errors with thread locks
             
         Returns:
             None
@@ -1167,7 +1195,7 @@ Question: {question}
         # Log model to MLflow
         mlflow.pyfunc.log_model(
             artifact_path="code_generation_service",
-            python_model=cls(),
+            python_model=cls(delay_async_init=delay_async_init),  # Create instance with delayed initialization
             artifacts=artifacts,
             signature=signature,
             code_paths=["./core", "../../src"],
@@ -1218,8 +1246,11 @@ Question: {question}
                 logger.error(f"Failed to initialize default embedding model: {str(e2)}")
                 # Continue with initialization even if embedding fails - some functions might not need it
         
-        # Call the parent load_context method to handle the rest of the initialization
-        super().load_context(context)
+        # Initialize async components if they haven't been initialized yet
+        # This is needed when loading from MLflow after serialization
+        if self.repository_status_tracker is None:
+            self._initialize_async_components()
+            logger.info("Initialized async components during model loading")
         
         # Call the parent load_context method to handle the rest of the initialization
         super().load_context(context)
