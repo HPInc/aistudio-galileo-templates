@@ -1,6 +1,0 @@
-langchain
-langchain-community
-langchain-huggingface
-pypdf
-chromadb
-promptquality

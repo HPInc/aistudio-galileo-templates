@@ -1,8 +1,0 @@
-langchain
-langchain-community
-langchain-huggingface
-pypdf
-chromadb
-promptquality
-galileo-protect
-galileo-observe

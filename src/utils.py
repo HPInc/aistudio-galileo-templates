@@ -10,6 +10,8 @@ import yaml
 import importlib.util
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, List, Tuple
+from trt_llm_langchain import TensorRTLangchain
+
 
 
 def configure_hf_cache(cache_dir: str = "/home/jovyan/local/hugging_face") -> None:
@@ -74,7 +76,8 @@ def configure_proxy(config: Dict[str, Any]) -> None:
 def initialize_llm(
     model_source: str = "local",
     secrets: Optional[Dict[str, Any]] = None,
-    local_model_path: str = "/home/jovyan/datafabric/llama2-7b/ggml-model-f16-Q5_K_M.gguf"
+    local_model_path: str = "/home/jovyan/datafabric/llama2-7b/ggml-model-f16-Q5_K_M.gguf",
+    hf_model_id: str = ""
 ) -> Any:
     """
     Initialize a language model based on specified source.
@@ -111,19 +114,46 @@ def initialize_llm(
             raise ValueError("HuggingFace API key is required for cloud model access")
             
         huggingfacehub_api_token = secrets["HUGGINGFACE_API_KEY"]
-        repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        if hf_model_id == "":
+            #Defaults to mistral 7b on HuggingFace Cloud
+            repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        else:
+            repo_id = hf_model_id
         return HuggingFaceEndpoint(
             huggingfacehub_api_token=huggingfacehub_api_token,
             repo_id=repo_id,
         )
     elif model_source == "hugging-face-local":
         from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-        
-        model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+        if hf_model_id == "":
+            #Defaults to Deepseek on HuggingFace Local
+            model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+        else:
+            model_id = hf_model_id        
+    
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         model = AutoModelForCausalLM.from_pretrained(model_id)
-        pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=100, device=0)
+        pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=500, device=0)
         return HuggingFacePipeline(pipeline=pipe)
+    elif model_source == "tensorrt":
+        #If a Hugging Face model is specified, it will be used - otherwise, it will try loading the model from local_path
+        try:
+            import tensorrt_llm
+            sampling_params = tensorrt_llm.SamplingParams(temperature=0.1, top_p=0.95, max_tokens=2000) 
+            if hf_model_id != "":
+                return TensorRTLangchain(model_path = hf_model_id, sampling_params = sampling_params)
+            else:
+                model_config = os.path.join(local_model_path, config.json)
+                if os.path.isdir(local_model_path) and os.path.isfile(model_config):
+                    return TensorRTLangchain(model_path = local_model_path, sampling_params = sampling_params)
+                else:
+                    raise Exception("Model format incompatible with TensorRT LLM")
+        except ImportError:
+            raise ImportError(
+                "Could not import tensorrt-llm library. "
+                "Please make sure tensorrt-llm is installed properly, or "
+                "consider using workspaces based on the NeMo Framework"
+            )
     elif model_source == "local":
         callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
         return LlamaCpp(
