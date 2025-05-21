@@ -1356,7 +1356,7 @@ Question: {question}
         try:
             # Convert to format expected by vector store
             df_converter = DataFrameConverter()
-            data_df = df_converter.convert(data)
+            data_df = df_converter.to_dataframe(data)
             
             # Create a unique collection name for this repository to avoid collisions
             import hashlib
