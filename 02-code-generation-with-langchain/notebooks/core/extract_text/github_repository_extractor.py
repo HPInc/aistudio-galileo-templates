@@ -79,6 +79,13 @@ class GitHubRepositoryExtractor:
             r'dist/assets/.*\.(js|css)$',  # Dist assets
             r'node_modules/.*',  # Node modules
         }
+        # Define specific filenames to exclude (lock files, large auto-generated JSON)
+        self.excluded_filenames = {
+            'package-lock.json',
+            'yarn.lock',
+            'pnpm-lock.yaml',
+            'package-lock.yaml'
+        }
         
         # Set up logging
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -160,6 +167,11 @@ class GitHubRepositoryExtractor:
         Returns:
             True if the file should be skipped, False otherwise
         """
+        # Exclude specific lock or auto-generated JSON files by name
+        basename = os.path.basename(file_path)
+        if basename in getattr(self, 'excluded_filenames', {}):
+            self.logger.info(f"Skipping excluded filename: {file_path}")
+            return True
         # Check file size
         if size > self.max_file_size_kb * 1024:
             self.logger.info(f"Skipping large file ({size/1024:.1f} KB): {file_path}")
