@@ -40,6 +40,8 @@ from core.extract_text.github_repository_extractor import GitHubRepositoryExtrac
 from core.generate_metadata.llm_context_updater import LLMContextUpdater
 from core.dataflow.dataflow import EmbeddingUpdater, DataFrameConverter
 from core.vector_database.vector_store_writer import VectorStoreWriter
+from core.generate_metadata.async_repository_processor import AsyncRepositoryProcessor
+from core.generate_metadata.repository_status_tracker import RepositoryStatusTracker, ProcessingStatus
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -81,6 +83,10 @@ class CodeGenerationService(BaseGenerativeService):
         # Set default processing parameters
         self.default_batch_size = 20
         self.default_timeout = 300  # 5 minutes
+        
+        # Initialize status tracker and async repository processor
+        self.repository_status_tracker = RepositoryStatusTracker()
+        self.repository_processor = None  # Will be initialized when required components are available
         
         # Configure logging to reduce noise
         logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -124,7 +130,8 @@ class CodeGenerationService(BaseGenerativeService):
         return self.embedding_function
     
     def extract_repository(self, repository_url: str, metadata_only: bool = False, 
-                          batch_size: int = 10, timeout: int = 300) -> List[Dict[str, Any]]:
+                          batch_size: int = 10, timeout: int = 300, 
+                          async_mode: bool = True) -> List[Dict[str, Any]]:
         """
         Extract code and metadata from a GitHub repository.
         Uses a cache mechanism to avoid re-processing the same repository.
@@ -134,13 +141,74 @@ class CodeGenerationService(BaseGenerativeService):
             metadata_only: If True, only perform fast metadata extraction without LLM processing
             batch_size: Number of files to process in each batch (defaults to 10 for better stability)
             timeout: Maximum time in seconds for the entire operation
+            async_mode: If True, process repository asynchronously and return status immediately
             
         Returns:
-            List of dictionaries containing extracted code and metadata
+            List of dictionaries containing extracted code and metadata,
+            or a status dict if async_mode is True
         """
         from functools import partial
         import concurrent.futures
         
+        # Initialize the async repository processor if not already done
+        if self.repository_processor is None and self.embedding_function is not None:
+            # Use dependency injection to provide the required classes
+            self.repository_processor = AsyncRepositoryProcessor(
+                repository_extractor_class=GitHubRepositoryExtractor,
+                llm_context_updater_class=LLMContextUpdater,
+                status_tracker=self.repository_status_tracker
+            )
+            logger.info("AsyncRepositoryProcessor initialized")
+            
+        # If async processor is not available, fall back to synchronous processing
+        if async_mode and self.repository_processor is not None:
+            logger.info(f"Starting asynchronous processing for repository: {repository_url}")
+            
+            # Get current status
+            status = self.repository_processor.get_repository_status(repository_url)
+            
+            # If already complete, use the cached result
+            if status.get("status") == ProcessingStatus.COMPLETE.value:
+                logger.info(f"Using cached complete repository: {repository_url}")
+                
+                # Get cached data and update the collection
+                extracted_data = status.get("context")
+                if extracted_data:
+                    self._store_in_vector_db(repository_url, extracted_data)
+                    return extracted_data
+            
+            # Start or continue processing asynchronously
+            extraction_params = {
+                "save_dir": "./repo_files",
+                "verbose": False,
+                "max_file_size_kb": 500,
+                "max_chunk_size": 100,
+                "supported_extensions": ('.py', '.ipynb', '.md', '.txt', '.json', '.js', '.ts')
+            }
+            
+            context_params = {
+                "llm_chain": self.llm if hasattr(self, 'llm') else None,
+                "prompt_template": self._get_metadata_prompt_template(),
+                "verbose": False,
+                "item_timeout": 30,
+                "max_retries": 2,
+                "batch_size": batch_size,
+                "overwrite": not metadata_only  # Only overwrite if doing full processing
+            }
+            
+            # Process repository in background and immediately return status
+            status = self.repository_processor.process_repository_async(
+                repo_url=repository_url,
+                extraction_params=extraction_params,
+                context_params=context_params,
+                force_refresh=False,
+                on_complete=self._on_repository_complete
+            )
+            
+            # Return the current status with a flag indicating this is an async response
+            return {"status": status, "async_mode": True, "repository_url": repository_url}
+            
+        # Synchronous processing (original implementation)
         start_time = time.time()
         
         try:
@@ -873,16 +941,71 @@ Question: {question}
             if repository_url:
                 logger.info(f"Repository URL provided: {repository_url}")
                 try:
+                    # Check if async mode is enabled via parameter
+                    async_mode = input_data.get("async_mode", True)
+                    if isinstance(async_mode, str):
+                        async_mode = async_mode.lower() == "true"
+                    
                     # Extract repository data with the specified parameters
                     start_time = time.time()
-                    self.extract_repository(
+                    repo_response = self.extract_repository(
                         repository_url, 
                         metadata_only=metadata_only,
                         timeout=process_timeout,
-                        batch_size=batch_size
+                        batch_size=batch_size,
+                        async_mode=async_mode
                     )
                     processing_time = time.time() - start_time
-                    logger.info(f"Repository processing completed in {processing_time:.2f} seconds")
+                    
+                    # Check if this is an asynchronous response
+                    if isinstance(repo_response, dict) and repo_response.get("async_mode", False):
+                        # This is an asynchronous processing status
+                        status = repo_response.get("status", {})
+                        status_value = status.get("status", "unknown")
+                        
+                        # Handle different status values
+                        if status_value == ProcessingStatus.COMPLETE.value:
+                            # Repository is already processed and available
+                            logger.info("Repository already processed, continuing with response generation")
+                        elif status_value in [ProcessingStatus.PROCESSING.value, ProcessingStatus.NOT_STARTED.value]:
+                            # Repository is being processed or just started
+                            progress = status.get("progress", 0)
+                            files_processed = status.get("files_processed", 0)
+                            total_files = status.get("total_files", 0)
+                            
+                            # Return a status response
+                            status_message = (
+                                f"Repository processing in progress: {progress}% complete. "
+                                f"Processed {files_processed}/{total_files} files. "
+                                f"Please retry your request in a few moments."
+                            )
+                            
+                            if status_value == ProcessingStatus.NOT_STARTED.value:
+                                status_message = "Repository processing has started. Please retry your request in a few moments."
+                                
+                            return pd.DataFrame([{
+                                "result": status_message,
+                                "status": status_value,
+                                "progress": progress,
+                                "repository_url": repository_url
+                            }])
+                        elif status_value == ProcessingStatus.ERROR.value:
+                            # Repository processing encountered an error
+                            error_message = status.get("error_message", "Unknown error during repository processing")
+                            logger.error(f"Repository processing error: {error_message}")
+                            
+                            # Fall back to direct generation
+                            logger.info("Falling back to direct generation due to repository processing error")
+                            result = self.direct_chain.invoke(
+                                {"question": question},
+                                config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
+                            )
+                            
+                            error_info = f"# Note: Repository context unavailable due to processing error\n# Error: {error_message}\n\n"
+                            return pd.DataFrame([{"result": error_info + result}])
+                    else:
+                        # Synchronous processing completed
+                        logger.info(f"Repository processing completed in {processing_time:.2f} seconds")
                     
                     # If we have data in the collection, use it for code generation
                     if self.collection:
@@ -1125,8 +1248,112 @@ Question: {question}
                     logger.warning(f"Failed to reset vector store: {str(e)}")
         else:
             logger.info(f"Setting repository state for: {repository_url}")
-            # If repository is in cache, activate it
+            
+            # If we have an async processor, check if the repository is processed there
+            if self.repository_processor is not None:
+                import hashlib
+                repo_id = hashlib.md5(repository_url.encode()).hexdigest()
+                status = self.repository_status_tracker.get_status(repo_id)
+                
+                if status and status.get("status") == ProcessingStatus.COMPLETE.value:
+                    # Repository is fully processed in the async processor
+                    logger.info(f"Repository {repository_url} found in async processor cache, activating")
+                    
+                    # Get the collection from the cache
+                    if repository_url in self.repository_cache:
+                        self.collection = self.repository_cache[repository_url]["collection"]
+                        logger.info("Collection activated from repository cache")
+                        return
+            
+            # Check traditional cache if not found in async processor
             if repository_url in self.repository_cache:
                 logger.info(f"Repository {repository_url} found in cache, activating")
                 self.collection = self.repository_cache[repository_url]["collection"]
             # Repository isn't in cache yet - it will be processed and added later
+    
+    def _get_metadata_prompt_template(self):
+        """Get the prompt template for metadata generation"""
+        from langchain_core.prompts import PromptTemplate
+        template = """
+        You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
+
+        Code:
+        {code}
+
+        File name:
+        {filename}
+
+        Context:
+        {context}
+
+        Describe what the code above does.
+        """
+        return PromptTemplate.from_template(template)
+        
+    def _on_repository_complete(self, repo_id: str, data: List[Dict[str, Any]]) -> None:
+        """
+        Callback for when repository processing completes.
+        This method is called by the AsyncRepositoryProcessor when a repository is fully processed.
+        
+        Args:
+            repo_id: The unique identifier for the repository
+            data: The processed data with context and embeddings
+        """
+        # Get the repository URL from the status tracker
+        repo_url = None
+        status = self.repository_status_tracker.get_status(repo_id)
+        if status:
+            repo_url = status.get("repository_url")
+        
+        if not repo_url:
+            logger.warning(f"Repository URL not found for ID: {repo_id}")
+            return
+            
+        logger.info(f"Repository processing completed for: {repo_url}")
+        
+        # Store the processed data in the vector database
+        self._store_in_vector_db(repo_url, data)
+        
+    def _store_in_vector_db(self, repository_url: str, data: List[Dict[str, Any]]) -> None:
+        """
+        Store repository data in the vector database.
+        
+        Args:
+            repository_url: URL of the GitHub repository
+            data: Processed data with context and embeddings
+        """
+        try:
+            # Convert to format expected by vector store
+            df_converter = DataFrameConverter()
+            data_df = df_converter.convert(data)
+            
+            # Create a unique collection name for this repository to avoid collisions
+            import hashlib
+            repo_hash = hashlib.md5(repository_url.encode()).hexdigest()[:8]
+            collection_name = f"repo_{repo_hash}"
+            
+            # Store in vector database
+            vector_writer = VectorStoreWriter(
+                embedding_model=self.embedding_function,
+                collection_name=collection_name
+            )
+            
+            # Write to vector store
+            self.collection = vector_writer.write(data_df)
+            logger.info(f"Repository data stored in collection: {collection_name}")
+            
+            # Update cache with the processed data
+            self.repository_cache[repository_url] = {
+                "data": data,
+                "collection": self.collection,
+                "timestamp": time.time(),
+                "metadata_only": False  # We always do full processing with async
+            }
+            
+            # Update retriever
+            self.retriever = self.collection.as_retriever()
+            logger.info(f"Updated retriever for collection: {collection_name}")
+            
+        except Exception as e:
+            logger.error(f"Error storing repository data in vector DB: {str(e)}")
+            raise
