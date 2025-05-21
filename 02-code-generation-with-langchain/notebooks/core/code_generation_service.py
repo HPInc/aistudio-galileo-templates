@@ -11,6 +11,9 @@ import sys
 import logging
 import traceback
 import time
+import json
+import datetime
+import numpy as np
 from typing import Dict, Any, List, Optional
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
@@ -315,7 +318,6 @@ class CodeGenerationService(BaseGenerativeService):
                 return updated_data
             
             # Store in cache for future use
-            import datetime
             self.repository_cache[repository_url] = {
                 "data": updated_data,
                 "collection": self.collection,
@@ -358,11 +360,9 @@ class CodeGenerationService(BaseGenerativeService):
             for item in data:
                 if 'embedding' not in item or not item['embedding']:
                     # Create a small random vector as placeholder
-                    import numpy as np
                     item['embedding'] = np.random.rand(384).tolist()  # 384 is the dimension for all-MiniLM-L6-v2
             
             # Convert to DataFrame
-            import pandas as pd
             df = pd.DataFrame([{
                 'id': item.get('id', f"id_{i}"),
                 'code': item.get('code', ''),
@@ -379,7 +379,6 @@ class CodeGenerationService(BaseGenerativeService):
             self.collection = writer.collection
             
             # Store in cache for future use
-            import datetime
             self.repository_cache[repository_url] = {
                 "data": data,
                 "collection": self.collection,
@@ -952,7 +951,6 @@ Question: {question}
             clean_code_result = clean_code(result)
             
             # Log processing info 
-            import json
             logger.info(f"Processing info: {json.dumps(processing_info)}")
             
             # Return only the clean code without any prefixes
