@@ -124,7 +124,7 @@ class CodeGenerationService(BaseGenerativeService):
         return self.embedding_function
     
     def extract_repository(self, repository_url: str, metadata_only: bool = False, 
-                          batch_size: int = 20, timeout: int = 300) -> List[Dict[str, Any]]:
+                          batch_size: int = 10, timeout: int = 300) -> List[Dict[str, Any]]:
         """
         Extract code and metadata from a GitHub repository.
         Uses a cache mechanism to avoid re-processing the same repository.
@@ -132,14 +132,14 @@ class CodeGenerationService(BaseGenerativeService):
         Args:
             repository_url: URL of the GitHub repository
             metadata_only: If True, only perform fast metadata extraction without LLM processing
-            batch_size: Number of files to process in each batch
+            batch_size: Number of files to process in each batch (defaults to 10 for better stability)
             timeout: Maximum time in seconds for the entire operation
             
         Returns:
             List of dictionaries containing extracted code and metadata
         """
-        import concurrent.futures
         from functools import partial
+        import concurrent.futures
         
         start_time = time.time()
         
@@ -179,9 +179,16 @@ class CodeGenerationService(BaseGenerativeService):
             file_count = len(extracted_data)
             logger.info(f"Extracted {file_count} code snippets from repository")
             
+            # Limit the number of files processed to avoid timeouts
+            max_files = 100
+            if file_count > max_files:
+                logger.warning(f"Repository has too many files ({file_count}). Limiting to {max_files} files")
+                extracted_data = extracted_data[:max_files]
+                file_count = len(extracted_data)
+            
             # Check timeout after extraction
-            if (time.time() - start_time) > timeout:
-                logger.warning("Repository extraction timeout reached. Returning partial results.")
+            if (time.time() - start_time) > timeout * 0.3:  # If extraction took 30% of timeout
+                logger.warning("Repository extraction took too long. Returning partial results with basic metadata.")
                 return self._store_partial_results(repository_url, extracted_data, metadata_only=True)
             
             # For metadata_only mode, skip LLM processing and just add basic metadata
@@ -225,20 +232,23 @@ class CodeGenerationService(BaseGenerativeService):
                     logger.warning("LLM not initialized, skipping metadata generation")
                     return self._store_partial_results(repository_url, extracted_data, metadata_only=True)
                 
-                # Process files in batches to avoid memory issues
+                # Process files in smaller batches to avoid memory issues
+                batch_size = min(batch_size, 10)  # Use at most 10 files per batch for stability
                 updated_data = []
                 total_batches = (file_count + batch_size - 1) // batch_size  # ceil division
                 
                 for batch_idx in range(total_batches):
                     # Check timeout before each batch
-                    if (time.time() - start_time) > timeout:
-                        logger.warning(f"Timeout reached after processing {batch_idx}/{total_batches} batches")
-                        # Store what we have so far
-                        if updated_data:
-                            updated_data.extend(extracted_data[len(updated_data):])
-                        else:
-                            updated_data = extracted_data
-                        return self._store_partial_results(repository_url, updated_data, metadata_only=True)
+                    remaining_time = timeout - (time.time() - start_time)
+                    if remaining_time < 60:  # If less than 1 minute remains
+                        logger.warning(f"Only {remaining_time:.1f}s remaining. Stopping processing after batch {batch_idx}/{total_batches}")
+                        # Add the unprocessed files with basic metadata
+                        for i in range(batch_idx * batch_size, file_count):
+                            item = extracted_data[i]
+                            filename = item.get('filename', 'unknown_file')
+                            item['context'] = f"File: {filename} (skipped due to time constraints)"
+                            updated_data.append(item)
+                        break
                     
                     batch_start = batch_idx * batch_size
                     batch_end = min((batch_idx + 1) * batch_size, file_count)
@@ -247,15 +257,17 @@ class CodeGenerationService(BaseGenerativeService):
                     logger.info(f"Processing batch {batch_idx+1}/{total_batches} ({len(current_batch)} files)")
                     
                     try:
-                        # Set a batch timeout that's a fraction of the total timeout
-                        batch_timeout = min(30, timeout // total_batches)
+                        # Set a batch timeout that's a fraction of the remaining time
+                        batch_timeout = min(20, remaining_time / (total_batches - batch_idx + 1))
+                        logger.info(f"Batch timeout: {batch_timeout:.1f}s, remaining time: {remaining_time:.1f}s")
+                        
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             batch_future = executor.submit(self._process_metadata_batch, 
                                                           current_batch, llm_chain, template)
                             batch_result = batch_future.result(timeout=batch_timeout)
                             updated_data.extend(batch_result)
                     except concurrent.futures.TimeoutError:
-                        logger.warning(f"Batch {batch_idx+1} processing timed out after {batch_timeout}s")
+                        logger.warning(f"Batch {batch_idx+1} processing timed out after {batch_timeout:.1f}s")
                         # Add the unprocessed items from this batch with basic metadata
                         for item in current_batch:
                             filename = item.get('filename', 'unknown_file')
@@ -268,10 +280,14 @@ class CodeGenerationService(BaseGenerativeService):
                             filename = item.get('filename', 'unknown_file')
                             item['context'] = f"File: {filename} (metadata generation failed)"
                             updated_data.append(item)
+                    
+                    # Add a small delay between batches to let the system recover
+                    time.sleep(1.0)
             
             # Check timeout again before embedding generation
-            if (time.time() - start_time) > timeout * 0.9:  # 90% of timeout
-                logger.warning("Approaching timeout limit. Skipping embedding generation.")
+            remaining_time = timeout - (time.time() - start_time)
+            if remaining_time < 60:  # Less than a minute left
+                logger.warning("Less than 60 seconds remaining. Skipping embedding generation.")
                 return self._store_partial_results(repository_url, updated_data, metadata_only=True)
             
             # Step 3: Generate embeddings for each code snippet
@@ -337,13 +353,22 @@ class CodeGenerationService(BaseGenerativeService):
     def _process_metadata_batch(self, batch, llm_chain, template):
         """Process a batch of files to generate metadata."""
         try:
+            # Calculate a reasonable per-item timeout (shorter to prevent worker timeouts)
+            per_item_timeout = 10  # Shorter timeout per item to prevent worker timeouts
+            batch_size = min(5, len(batch))  # Smaller sub-batches for better reliability
+            
             updater = LLMContextUpdater(
                 llm_chain=llm_chain,
                 prompt_template=template,
                 verbose=False,
-                print_prompt=False
+                print_prompt=False,
+                item_timeout=per_item_timeout,  # Shorter per-item timeout
+                max_retries=1,  # Fewer retries to prevent cascading timeouts
+                batch_size=batch_size  # Process in smaller sub-batches
             )
-            return updater.update(batch)
+            # Set a reasonable global timeout for the entire batch
+            global_timeout = per_item_timeout * len(batch) * 0.8  # 80% of theoretical max time
+            return updater.update(batch, global_timeout=global_timeout)
         except Exception as e:
             logger.error(f"Error in batch metadata processing: {str(e)}")
             # Return batch with basic context information for resilience

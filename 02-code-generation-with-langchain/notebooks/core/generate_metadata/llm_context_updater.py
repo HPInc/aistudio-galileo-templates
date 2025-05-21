@@ -53,6 +53,25 @@ class LLMContextUpdater:
         start_time = time.time()
         updated_structure = []
         
+        # Skip files that are too large - they are likely to cause timeouts
+        filtered_data = []
+        for item in data_structure:
+            code = item.get('code', '')
+            if len(code) > 50000:  # Skip very large files (>50KB)
+                filename = item.get('filename', 'unknown')
+                self.logger.warning(f"Skipping large file {filename} ({len(code)} bytes)")
+                item['context'] = f"File: {filename} (too large for processing: {len(code)} bytes)"
+                updated_structure.append(item)
+            else:
+                filtered_data.append(item)
+        
+        data_structure = filtered_data
+        
+        # Early exit if no items to process after filtering
+        if not data_structure:
+            self.logger.warning("No files to process after filtering large files")
+            return updated_structure
+        
         # Batch processing if batch_size is specified
         if self.batch_size and len(data_structure) > self.batch_size:
             self.logger.info(f"Processing {len(data_structure)} items in batches of {self.batch_size}")
@@ -60,7 +79,10 @@ class LLMContextUpdater:
             # Process data in batches
             for i in range(0, len(data_structure), self.batch_size):
                 # Check if we've exceeded the global timeout
-                if self.global_timeout and (time.time() - start_time) > self.global_timeout:
+                elapsed_time = time.time() - start_time
+                remaining_time = None if self.global_timeout is None else self.global_timeout - elapsed_time
+                
+                if self.global_timeout and elapsed_time > self.global_timeout:
                     self.logger.warning(f"Global timeout ({self.global_timeout}s) reached after processing {len(updated_structure)} items")
                     # Add remaining items with basic context
                     remaining_items = len(data_structure) - len(updated_structure)
@@ -76,6 +98,14 @@ class LLMContextUpdater:
                 # Process the current batch
                 batch = data_structure[i:i+self.batch_size]
                 batch_desc = f"Batch {i//self.batch_size + 1}/{(len(data_structure) + self.batch_size - 1)//self.batch_size}"
+                
+                # Adjust item timeout based on remaining time if applicable
+                if remaining_time is not None:
+                    # Ensure each item gets a fair share of the remaining time, with a minimum threshold
+                    items_left = len(data_structure) - i
+                    adjusted_timeout = max(3, min(self.item_timeout, remaining_time / items_left * 0.8))
+                    self.item_timeout = adjusted_timeout
+                
                 batch_results = self._process_batch(batch, batch_desc)
                 updated_structure.extend(batch_results)
                 
@@ -83,15 +113,42 @@ class LLMContextUpdater:
                 time.sleep(0.5)
         else:
             # Process everything as a single batch
-            updated_structure = self._process_batch(data_structure, "Updating Contexts")
+            updated_structure.extend(self._process_batch(data_structure, "Updating Contexts"))
             
         return updated_structure
 
     def _process_batch(self, batch, desc):
         """Process a batch of items with progress tracking."""
         results = []
+        batch_start_time = time.time()
         
-        for item in tqdm(batch, desc=desc):
+        for i, item in enumerate(batch):
+            # Check if we need to abort the batch due to global timeout
+            if self.global_timeout:
+                elapsed_total = time.time() - batch_start_time
+                if elapsed_total > self.global_timeout * 0.8:  # If we've used 80% of our time
+                    remaining = len(batch) - i
+                    self.logger.warning(f"Batch processing taking too long. Skipping remaining {remaining} items")
+                    
+                    # Add the remaining items with basic context
+                    for j in range(i, len(batch)):
+                        skipped_item = batch[j]
+                        filename = skipped_item.get('filename', 'unknown')
+                        if 'context' not in skipped_item or not skipped_item['context'] or self.overwrite:
+                            skipped_item['context'] = f"File: {filename} (skipped due to batch timeout)"
+                        results.append(skipped_item)
+                    
+                    return results
+            
+            # Show progress indicator
+            if i > 0:  # After the first item, we can estimate time
+                elapsed = time.time() - batch_start_time
+                avg_time = elapsed / i
+                est_remaining = avg_time * (len(batch) - i)
+                if hasattr(tqdm, '_instances') and tqdm._instances:
+                    for t in tqdm._instances:
+                        t.set_description(f"{desc} (est. {est_remaining:.1f}s left)")
+            
             # Try to process the item with retries
             processed = False
             retries = 0
@@ -126,6 +183,20 @@ class LLMContextUpdater:
             self.logger.debug(f"Skipping context for: {filename}")
             return
         
+        # Skip very large files - they are likely to cause timeouts
+        if len(code) > 50000:  # Skip files > 50KB
+            item['context'] = f"File: {filename} (too large for processing: {len(code)} bytes)"
+            self.logger.warning(f"Skipping large file {filename} ({len(code)} bytes)")
+            return
+            
+        # For very large files (10KB-50KB), truncate the code to avoid long processing times
+        truncated = False
+        if len(code) > 10000:
+            truncated_length = 10000
+            code = code[:truncated_length] + f"\n\n... (truncated, original size: {len(code)} bytes)"
+            truncated = True
+            self.logger.info(f"Truncated large file {filename} from {len(item['code'])} to {truncated_length} bytes")
+        
         # Prepare inputs for the LLM
         inputs = {
             "code": code,
@@ -145,7 +216,10 @@ class LLMContextUpdater:
                 response = future.result(timeout=self.item_timeout)
                 
                 # Update the context with the LLM response
-                item['context'] = response.strip()
+                if truncated:
+                    item['context'] = f"{response.strip()} (Note: analysis based on truncated file)"
+                else:
+                    item['context'] = response.strip()
                 self.logger.debug(f"Context updated for: {filename}")
                 
         except concurrent.futures.TimeoutError:
