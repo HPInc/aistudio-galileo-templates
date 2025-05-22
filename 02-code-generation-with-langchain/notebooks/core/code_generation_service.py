@@ -133,7 +133,6 @@ class CodeGenerationService(BaseGenerativeService):
         """
         logger.info("Initializing embedding function")
         
-        
         # Determine which model path to use
         model_name = embedding_model_path if embedding_model_path else "all-MiniLM-L6-v2"
         if embedding_model_path:
