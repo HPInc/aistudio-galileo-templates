@@ -25,6 +25,8 @@ from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
 from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
 
+from langchain_huggingface import HuggingFaceEmbeddings
+
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
@@ -35,7 +37,7 @@ core_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if core_path not in sys.path:
     sys.path.append(core_path)
 
-# Import GitHub repository extraction tools
+# Import GitHub extraction and context storage tools
 from core.extract_text.github_repository_extractor import GitHubRepositoryExtractor
 from core.generate_metadata.llm_context_updater import LLMContextUpdater
 from core.dataflow.dataflow import EmbeddingUpdater, DataFrameConverter
@@ -59,11 +61,6 @@ class CodeGenerationService(BaseGenerativeService):
         IMPORTANT: The embedding initialization order is critical - embeddings must be
         initialized before any LLM model to prevent CUDA library loading issues
         that may occur when initializing LlamaCpp models.
-        
-        To avoid downloading the default embedding model unnecessarily, the actual
-        embedding initialization is deferred until load_context is called, which
-        will check for an artifact model first. If rapid initialization is needed
-        before load_context is called, initialize_embedding_function can be called manually.
         
         Args:
             delay_async_init: If True, delay initialization of thread-based components
@@ -136,10 +133,6 @@ class CodeGenerationService(BaseGenerativeService):
         """
         logger.info("Initializing embedding function")
         
-        try:
-            from langchain_huggingface import HuggingFaceEmbeddings
-        except ImportError:
-            from langchain.embeddings import HuggingFaceEmbeddings
         
         # Determine which model path to use
         model_name = embedding_model_path if embedding_model_path else "all-MiniLM-L6-v2"
@@ -149,37 +142,18 @@ class CodeGenerationService(BaseGenerativeService):
             logger.info("Using default embedding model: all-MiniLM-L6-v2")
         
         # Initialize the embedding function
-        try:
-            self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
-            logger.info(f"Successfully initialized HuggingFaceEmbeddings with model: {model_name}")
+        self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
+        logger.info(f"Successfully initialized HuggingFaceEmbeddings with model: {model_name}")
+        
+        # Create the adapter 
+        self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
+        
+        logger.info("ChromaEmbeddingAdapter successfully initialized with all required methods")
             
-            # Create the adapter with our updated implementation that has both __call__ and embed_query methods
-            self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
-            
-            logger.info("ChromaEmbeddingAdapter successfully initialized with all required methods")
-                
-            return self.embedding_function
-        except Exception as e:
-            logger.error(f"Failed to initialize embedding function: {str(e)}")
-            # Create a basic fallback embedding function that returns zeros
-            from typing import List
-            
-            class FallbackEmbedding:
-                """Simple fallback embedding that returns zeros"""
-                def embed_query(self, text: str) -> List[float]:
-                    return [0.0] * 384  # Default dimension
-                    
-                def embed_documents(self, documents: List[str]) -> List[List[float]]:
-                    return [[0.0] * 384 for _ in documents]
-            
-            self.embedding_function = FallbackEmbedding()
-            self.chroma_embedding_function = FallbackEmbedding()
-            logger.warning("Using fallback embedding function that returns zeros")
-            return self.embedding_function
+        return self.embedding_function
     
     def extract_repository(self, repository_url: str, metadata_only: bool = False, 
-                          batch_size: int = 10, timeout: int = 300, 
-                          async_mode: bool = True) -> List[Dict[str, Any]]:
+                          batch_size: int = 10, timeout: int = 300) -> Dict[str, Any]:
         """
         Extract code and metadata from a GitHub repository.
         Uses a cache mechanism to avoid re-processing the same repository.
@@ -189,15 +163,10 @@ class CodeGenerationService(BaseGenerativeService):
             metadata_only: If True, only perform fast metadata extraction without LLM processing
             batch_size: Number of files to process in each batch (defaults to 10 for better stability)
             timeout: Maximum time in seconds for the entire operation
-            async_mode: If True, process repository asynchronously and return status immediately
             
         Returns:
-            List of dictionaries containing extracted code and metadata,
-            or a status dict if async_mode is True
+            A status dict with information about the asynchronous processing job
         """
-        from functools import partial
-        import concurrent.futures
-        
         # Initialize the async repository processor if not already done
         if self.repository_processor is None and self.embedding_function is not None:
             # Use dependency injection to provide the required classes
@@ -208,335 +177,51 @@ class CodeGenerationService(BaseGenerativeService):
             )
             logger.info("AsyncRepositoryProcessor initialized")
             
-        # If async processor is not available, fall back to synchronous processing
-        if async_mode and self.repository_processor is not None:
-            logger.info(f"Starting asynchronous processing for repository: {repository_url}")
-            
-            # Get current status
-            status = self.repository_processor.get_repository_status(repository_url)
-            
-            # If already complete, use the cached result
-            if status.get("status") == ProcessingStatus.COMPLETE.value:
-                logger.info(f"Using cached complete repository: {repository_url}")
-                
-                # Get cached data and update the collection
-                extracted_data = status.get("context")
-                if extracted_data:
-                    self._store_in_vector_db(repository_url, extracted_data)
-                    return extracted_data
-            
-            # Start or continue processing asynchronously
-            extraction_params = {
-                "save_dir": "./repo_files",
-                "verbose": False,
-                "max_file_size_kb": 500,
-                "max_chunk_size": 100,
-                "supported_extensions": ('.py', '.ipynb', '.md', '.txt', '.json', '.js', '.ts')
-            }
-            
-            context_params = {
-                "llm_chain": self.llm if hasattr(self, 'llm') else None,
-                "prompt_template": self._get_metadata_prompt_template(),
-                "verbose": False,
-                "item_timeout": 30,
-                "max_retries": 2,
-                "batch_size": batch_size,
-                "overwrite": not metadata_only  # Only overwrite if doing full processing
-            }
-            
-            # Process repository in background and immediately return status
-            status = self.repository_processor.process_repository_async(
-                repo_url=repository_url,
-                extraction_params=extraction_params,
-                context_params=context_params,
-                force_refresh=False,
-                on_complete=self._on_repository_complete
-            )
-            
-            # Return the current status with a flag indicating this is an async response
-            return {"status": status, "async_mode": True, "repository_url": repository_url}
-            
-        # Synchronous processing (original implementation)
-        start_time = time.time()
+        # Get current status
+        status = self.repository_processor.get_repository_status(repository_url)
         
-        try:
-            self.reset_repository_state(repository_url)
+        # If already complete, use the cached result
+        if status.get("status") == ProcessingStatus.COMPLETE.value:
+            logger.info(f"Using cached complete repository: {repository_url}")
             
-            # Check if repository is already in cache
-            if repository_url in self.repository_cache:
-                logger.info(f"Using cached data for repository: {repository_url}")
-                
-                # Update the collection reference from the cache
-                self.collection = self.repository_cache[repository_url]["collection"]
-                metadata_status = self.repository_cache[repository_url].get("metadata_only", False)
-                
-                # If we want full processing but the cache only has metadata, we need to process further
-                if metadata_only or not metadata_status:
-                    try:
-                        count = self.collection.count()
-                        logger.info(f"Cache hit: Collection has {count} documents")
-                        return self.repository_cache[repository_url]["data"]
-                    except Exception as e:
-                        logger.warning(f"Cached collection error: {str(e)}. Re-processing repository.")
-                        # Continue with fresh processing if we can't access the cached collection
-            
-            logger.info(f"Extracting code from repository: {repository_url} (metadata_only={metadata_only})")
-            
-            # Step 1: Clone repository and extract files
-            extractor = GitHubRepositoryExtractor(
-                repo_url=repository_url,
-                save_dir="./repo_files",
-                verbose=False,
-                max_file_size_kb=500,
-                max_chunk_size=100,
-                supported_extensions=('.py', '.ipynb', '.md', '.txt', '.json', '.js', '.ts')
-            )
-            extracted_data = extractor.run()
-            file_count = len(extracted_data)
-            logger.info(f"Extracted {file_count} code snippets from repository")
-            
-            # Limit the number of files processed to avoid timeouts
-            max_files = 100
-            if file_count > max_files:
-                logger.warning(f"Repository has too many files ({file_count}). Limiting to {max_files} files")
-                extracted_data = extracted_data[:max_files]
-                file_count = len(extracted_data)
-            
-            # Check timeout after extraction
-            if (time.time() - start_time) > timeout * 0.3:  # If extraction took 30% of timeout
-                logger.warning("Repository extraction took too long. Returning partial results with basic metadata.")
-                return self._store_partial_results(repository_url, extracted_data, metadata_only=True)
-            
-            # For metadata_only mode, skip LLM processing and just add basic metadata
-            if metadata_only:
-                logger.info("Metadata-only mode: Skipping LLM context generation")
-                # Add basic metadata to each file
-                for item in extracted_data:
-                    filename = item.get('filename', 'unknown_file')
-                    # Generate basic metadata based on file extension and size
-                    extension = os.path.splitext(filename)[1] if '.' in filename else ''
-                    code_size = len(item.get('code', ''))
-                    item['context'] = f"File: {filename} ({extension} file, {code_size} characters)"
-                    
-                # Skip to embeddings generation
-                updated_data = extracted_data
-            else:
-                # Step 2: Use LLM to generate metadata for each code snippet with batching
-                from langchain_core.prompts import PromptTemplate
-                template = """
-                You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
-
-                Code:
-                {code}
-
-                File name:
-                {filename}
-
-                Context:
-                {context}
-
-                Describe what the code above does.
-                """
-                
-                prompt = PromptTemplate.from_template(template)
-                
-                # Only use the LLM if it's been initialized
-                if self.llm:
-                    logger.info("Using existing LLM model for metadata generation")
-                    llm_chain = prompt | self.llm
-                else:
-                    logger.warning("LLM not initialized, skipping metadata generation")
-                    return self._store_partial_results(repository_url, extracted_data, metadata_only=True)
-                
-                # Process files in smaller batches to avoid memory issues
-                batch_size = min(batch_size, 10)  # Use at most 10 files per batch for stability
-                updated_data = []
-                total_batches = (file_count + batch_size - 1) // batch_size  # ceil division
-                
-                for batch_idx in range(total_batches):
-                    # Check timeout before each batch
-                    remaining_time = timeout - (time.time() - start_time)
-                    if remaining_time < 60:  # If less than 1 minute remains
-                        logger.warning(f"Only {remaining_time:.1f}s remaining. Stopping processing after batch {batch_idx}/{total_batches}")
-                        # Add the unprocessed files with basic metadata
-                        for i in range(batch_idx * batch_size, file_count):
-                            item = extracted_data[i]
-                            filename = item.get('filename', 'unknown_file')
-                            item['context'] = f"File: {filename} (skipped due to time constraints)"
-                            updated_data.append(item)
-                        break
-                    
-                    batch_start = batch_idx * batch_size
-                    batch_end = min((batch_idx + 1) * batch_size, file_count)
-                    current_batch = extracted_data[batch_start:batch_end]
-                    
-                    logger.info(f"Processing batch {batch_idx+1}/{total_batches} ({len(current_batch)} files)")
-                    
-                    try:
-                        # Set a batch timeout that's a fraction of the remaining time
-                        batch_timeout = min(20, remaining_time / (total_batches - batch_idx + 1))
-                        logger.info(f"Batch timeout: {batch_timeout:.1f}s, remaining time: {remaining_time:.1f}s")
-                        
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            batch_future = executor.submit(self._process_metadata_batch, 
-                                                          current_batch, llm_chain, template)
-                            batch_result = batch_future.result(timeout=batch_timeout)
-                            updated_data.extend(batch_result)
-                    except concurrent.futures.TimeoutError:
-                        logger.warning(f"Batch {batch_idx+1} processing timed out after {batch_timeout:.1f}s")
-                        # Add the unprocessed items from this batch with basic metadata
-                        for item in current_batch:
-                            filename = item.get('filename', 'unknown_file')
-                            item['context'] = f"File: {filename} (metadata generation timed out)"
-                            updated_data.append(item)
-                    except Exception as batch_error:
-                        logger.error(f"Error processing batch {batch_idx+1}: {str(batch_error)}")
-                        # Add the unprocessed items from this batch with basic metadata
-                        for item in current_batch:
-                            filename = item.get('filename', 'unknown_file')
-                            item['context'] = f"File: {filename} (metadata generation failed)"
-                            updated_data.append(item)
-                    
-                    # Add a small delay between batches to let the system recover
-                    time.sleep(1.0)
-            
-            # Check timeout again before embedding generation
-            remaining_time = timeout - (time.time() - start_time)
-            if remaining_time < 60:  # Less than a minute left
-                logger.warning("Less than 60 seconds remaining. Skipping embedding generation.")
-                return self._store_partial_results(repository_url, updated_data, metadata_only=True)
-            
-            # Step 3: Generate embeddings for each code snippet
-            try:
-                embedding_updater = EmbeddingUpdater(embedding_model=self.embedding_function, verbose=False)
-                updated_data = embedding_updater.update(updated_data)
-                logger.info("Embeddings generated successfully")
-            except Exception as e:
-                logger.error(f"Error during embedding generation: {str(e)}")
-                # Continue with the process, just log the error
-            
-            # Step 4: Convert to DataFrame for easier processing
-            try:
-                converter = DataFrameConverter(verbose=False)
-                df = converter.to_dataframe(updated_data)
-                logger.info("Data conversion to DataFrame complete")
-            except Exception as e:
-                logger.error(f"Error during DataFrame conversion: {str(e)}")
-                # Create a basic DataFrame with just the essential fields
-                import pandas as pd
-                basic_data = []
-                for item in updated_data:
-                    basic_data.append({
-                        'id': item.get('id', f"id_{len(basic_data)}"),
-                        'code': item.get('code', ''),
-                        'filename': item.get('filename', 'unknown'),
-                        'context': item.get('context', ''),
-                        'embedding': item.get('embedding', [])
-                    })
-                df = pd.DataFrame(basic_data)
-                logger.info("Created basic DataFrame with essential fields")
-            
-            # Step 5: Store in vector database
-            try:
-                writer = VectorStoreWriter(
-                    collection_name=self.collection_name,
-                    verbose=False
-                )
-                writer.upsert_dataframe(df)
-                logger.info(f"Repository data stored in collection: {self.collection_name}")
-                
-                # Update the collection reference
-                self.collection = writer.collection
-            except Exception as e:
-                logger.error(f"Error storing data in vector database: {str(e)}")
-                # If we can't store in the database, return what we have without caching
-                return updated_data
-            
-            # Store in cache for future use
-            self.repository_cache[repository_url] = {
-                "data": updated_data,
-                "collection": self.collection,
-                "timestamp": datetime.datetime.now().isoformat(),
-                "metadata_only": metadata_only
-            }
-            logger.info(f"Repository {repository_url} added to cache (metadata_only={metadata_only})")
-            
-            return updated_data
-        except Exception as e:
-            logger.error(f"Error extracting repository data: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            # Return empty list instead of raising, to allow graceful degradation
-            return []
+            # Get cached data and update the collection
+            extracted_data = status.get("context")
+            if extracted_data:
+                self._store_in_vector_db(repository_url, extracted_data)
+                return extracted_data
+        
+        # Start or continue processing asynchronously
+        extraction_params = {
+            "save_dir": "./repo_files",
+            "verbose": False,
+            "max_file_size_kb": 500,
+            "max_chunk_size": 100,
+            "supported_extensions": ('.py', '.ipynb', '.md', '.txt', '.json', '.js', '.ts')
+        }
+        
+        context_params = {
+            "llm_chain": self.llm if hasattr(self, 'llm') else None,
+            "prompt_template": self._get_metadata_prompt_template(),
+            "verbose": False,
+            "item_timeout": 30,
+            "max_retries": 2,
+            "batch_size": batch_size,
+            "overwrite": not metadata_only  # Only overwrite if doing full processing
+        }
+        
+        # Process repository in background and immediately return status
+        status = self.repository_processor.process_repository_async(
+            repo_url=repository_url,
+            extraction_params=extraction_params,
+            context_params=context_params,
+            force_refresh=False,
+            on_complete=self._on_repository_complete
+        )
+        
+        # Return the current processing status
+        return {"status": status, "repository_url": repository_url}
     
-    def _process_metadata_batch(self, batch, llm_chain, template):
-        """Process a batch of files to generate metadata."""
-        try:
-            # Calculate a reasonable per-item timeout (shorter to prevent worker timeouts)
-            per_item_timeout = 10  # Shorter timeout per item to prevent worker timeouts
-            batch_size = min(5, len(batch))  # Smaller sub-batches for better reliability
-            
-            updater = LLMContextUpdater(
-                llm_chain=llm_chain,
-                prompt_template=template,
-                verbose=False,
-                print_prompt=False,
-                item_timeout=per_item_timeout,  # Shorter per-item timeout
-                max_retries=1,  # Fewer retries to prevent cascading timeouts
-                batch_size=batch_size  # Process in smaller sub-batches
-            )
-            # Set a reasonable global timeout for the entire batch
-            global_timeout = per_item_timeout * len(batch) * 0.8  # 80% of theoretical max time
-            return updater.update(batch, global_timeout=global_timeout)
-        except Exception as e:
-            logger.error(f"Error in batch metadata processing: {str(e)}")
-            # Return batch with basic context information for resilience
-            for item in batch:
-                if 'context' not in item or not item['context']:
-                    filename = item.get('filename', 'unknown_file')
-                    item['context'] = f"File: {filename} (metadata generation failed)"
-            return batch
-    
-    def _store_partial_results(self, repository_url, data, metadata_only=True):
-        """Store partial results in cache and vector database."""
-        try:
-            # Add basic embeddings if missing
-            for item in data:
-                if 'embedding' not in item or not item['embedding']:
-                    # Create a small random vector as placeholder
-                    item['embedding'] = np.random.rand(384).tolist()  # 384 is the dimension for all-MiniLM-L6-v2
-            
-            # Convert to DataFrame
-            df = pd.DataFrame([{
-                'id': item.get('id', f"id_{i}"),
-                'code': item.get('code', ''),
-                'filename': item.get('filename', 'unknown'),
-                'context': item.get('context', ''),
-                'embedding': item.get('embedding', [])
-            } for i, item in enumerate(data)])
-            
-            # Store in vector database
-            writer = VectorStoreWriter(
-                collection_name=self.collection_name,
-                verbose=False
-            )
-            writer.upsert_dataframe(df)
-            # Update the collection reference and cache
-            self.collection = writer.collection
-            
-            # Store in cache for future use
-            self.repository_cache[repository_url] = {
-                "data": data,
-                "collection": self.collection,
-                "timestamp": datetime.datetime.now().isoformat(),
-                "metadata_only": metadata_only
-            }
-            logger.info(f"Stored partial results for {repository_url} (metadata_only={metadata_only})")
-            
-            return data
-        except Exception as e:
-            logger.error(f"Error storing partial results: {str(e)}")
-            return data
+
     
     def custom_retriever(self, query: str, top_n: int = None) -> List[Document]:
         """
@@ -731,7 +416,7 @@ class CodeGenerationService(BaseGenerativeService):
             context: MLflow model context containing artifacts
         """
         try:
-            # Ensure embedding function is initialized before loading LLM (critical for CUDA library loading)
+            # Ensure embedding model is initialized before loading LLM (critical for CUDA library loading)
             logger.info("Ensuring embedding model is initialized before loading LLM")
             if hasattr(self, 'embedding_function') and self.embedding_function is not None:
                 logger.info("Using existing embedding function instance")
@@ -1118,25 +803,19 @@ Question: {question}
             if repository_url:
                 logger.info(f"Repository URL provided: {repository_url}")
                 try:
-                    # Check if async mode is enabled via parameter
-                    async_mode = input_data.get("async_mode", True)
-                    if isinstance(async_mode, str):
-                        async_mode = async_mode.lower() == "true"
-                    
                     # Extract repository data with the specified parameters
                     start_time = time.time()
                     repo_response = self.extract_repository(
                         repository_url, 
                         metadata_only=metadata_only,
                         timeout=process_timeout,
-                        batch_size=batch_size,
-                        async_mode=async_mode
+                        batch_size=batch_size
                     )
                     processing_time = time.time() - start_time
                     
-                    # Check if this is an asynchronous response
-                    if isinstance(repo_response, dict) and repo_response.get("async_mode", False):
-                        # This is an asynchronous processing status
+                    # Process the repository response
+                    if isinstance(repo_response, dict) and "status" in repo_response:
+                        # This is a processing status response
                         status = repo_response.get("status", {})
                         status_value = status.get("status", "unknown")
                         
@@ -1181,7 +860,7 @@ Question: {question}
                             error_info = f"# Note: Repository context unavailable due to processing error\n# Error: {error_message}\n\n"
                             return pd.DataFrame([{"result": error_info + result}])
                     else:
-                        # Synchronous processing completed
+                        # Repository processing completed
                         logger.info(f"Repository processing completed in {processing_time:.2f} seconds")
                     
                     # If we have data in the collection, use it for code generation

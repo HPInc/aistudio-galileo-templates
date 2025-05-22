@@ -1,15 +1,6 @@
 import logging
 from typing import List, Any
 
-# Try different import paths based on what's available in the project
-try:
-    from langchain_huggingface import HuggingFaceEmbeddings
-except ImportError:
-    try:
-        from langchain.embeddings import HuggingFaceEmbeddings
-    except ImportError:
-        pass  # The import will be used for type hints only, not required at runtime
-
 logger = logging.getLogger(__name__)
 
 class ChromaEmbeddingAdapter:
