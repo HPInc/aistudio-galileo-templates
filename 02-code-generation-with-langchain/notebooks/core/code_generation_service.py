@@ -20,7 +20,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema import StrOutputParser, Document
 from langchain_community.llms import LlamaCpp
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
 from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
@@ -576,7 +576,6 @@ class CodeGenerationService(BaseGenerativeService):
             try:
                 if not hasattr(self.vector_store._embedding_function, 'embed_query'):
                     logger.warning("Vector store has invalid embedding function - reinitializing")
-                    from langchain_community.vectorstores import Chroma
                     # Recreate the vector store with proper embedding function
                     self.vector_store = Chroma(
                         collection_name=self.collection_name,
@@ -594,8 +593,7 @@ class CodeGenerationService(BaseGenerativeService):
             # Try to create a proper vector store first
             try:
                 import chromadb
-                from langchain_community.vectorstores import Chroma
-                
+
                 # Ensure we have embedding function
                 if self.embedding_function is None or self.chroma_embedding_function is None:
                     logger.warning("Missing embedding function. Initializing default embedding model.")
@@ -742,7 +740,6 @@ class CodeGenerationService(BaseGenerativeService):
                 logger.error(f"Exception type: {type(col_err).__name__}")
             
             # Initialize LangChain vector store - IMPORTANT: pass the embedding function
-            from langchain_community.vectorstores import Chroma
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
                 collection_name=self.collection_name,
@@ -1634,10 +1631,6 @@ Question: {question}
                     self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
                     logger.info("Successfully recreated embedding adapter with all required methods")
                 
-                # Use the proper import for LangChain community extensions
-                from langchain_community.vectorstores import Chroma
-                
-                # Create the vector store with the correct embedding function
                 self.vector_store = Chroma(
                     client=client,
                     collection_name=collection_name,
@@ -1650,9 +1643,6 @@ Question: {question}
                 
                 # Try again with a different approach
                 try:
-                    from langchain_community.vectorstores import Chroma
-                    # Try direct path-based initialization
-                    
                     # First ensure directory exists
                     import os
                     os.makedirs(persist_dir, exist_ok=True)
