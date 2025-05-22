@@ -15,18 +15,23 @@ class VectorStoreWriter:
         """
         self.verbose = verbose
         self.embedding_model = embedding_model
-        self.client = chromadb.Client()
+        
+        # Use PersistentClient for consistency with other code
+        persist_dir = "./chroma_db"
+        self.client = chromadb.PersistentClient(path=persist_dir)
+        
         # Try to use embedding_model if provided and supported by ChromaDB
         collection_kwargs = {"name": collection_name}
-        if embedding_model is not None:
-            collection_kwargs["embedding_function"] = embedding_model
+        # Don't pass the embedding_function to avoid ChromaDB interface issues
+        
         try:
             self.collection = self.client.get_or_create_collection(**collection_kwargs)
-            logger.info(f"ChromaDB collection '{collection_name}' initialized with embedding_model: {embedding_model is not None}.")
-        except TypeError:
+            logger.info(f"ChromaDB collection '{collection_name}' initialized with persistent storage.")
+        except TypeError as e:
+            logger.warning(f"Error creating collection: {str(e)}")
             # Fallback for older ChromaDB versions
             self.collection = self.client.get_or_create_collection(name=collection_name)
-            logger.info(f"ChromaDB collection '{collection_name}' initialized (embedding_model not used).")
+            logger.info(f"ChromaDB collection '{collection_name}' initialized with fallback method.")
 
     def upsert_dataframe(self, df):
         """

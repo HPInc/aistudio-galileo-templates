@@ -420,8 +420,7 @@ class CodeGenerationService(BaseGenerativeService):
             try:
                 writer = VectorStoreWriter(
                     collection_name=self.collection_name,
-                    verbose=False,
-                    embedding_model=self.embedding_function
+                    verbose=False
                 )
                 writer.upsert_dataframe(df)
                 logger.info(f"Repository data stored in collection: {self.collection_name}")
@@ -499,8 +498,7 @@ class CodeGenerationService(BaseGenerativeService):
             # Store in vector database
             writer = VectorStoreWriter(
                 collection_name=self.collection_name,
-                verbose=False,
-                embedding_model=self.chroma_embedding_function
+                verbose=False
             )
             writer.upsert_dataframe(df)
             # Update the collection reference and cache
@@ -585,18 +583,16 @@ class CodeGenerationService(BaseGenerativeService):
             # Try to get existing collection or create a new one
             try:
                 self.collection = client.get_or_create_collection(
-                    name=self.collection_name,
-                    embedding_function=self.chroma_embedding_function
+                    name=self.collection_name
                 )
                 logger.info(f"Collection '{self.collection_name}' loaded/created successfully")
             except Exception as col_err:
                 logger.error(f"Error getting/creating collection: {str(col_err)}")
                 logger.error(f"Exception type: {type(col_err).__name__}")
             
-            # Initialize LangChain vector store with the embedding function
+            # Initialize LangChain vector store
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=self.chroma_embedding_function,
                 collection_name=self.collection_name
             )
             self.retriever = self.vector_store.as_retriever()
@@ -606,7 +602,7 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
             # Use the embedding function that was already initialized in __init__
-            self.vector_store = Chroma(embedding_function=self.chroma_embedding_function)
+            self.vector_store = Chroma()
             self.retriever = self.vector_store.as_retriever()
             logger.info("Created new empty vector store")
     
@@ -1373,13 +1369,16 @@ Question: {question}
             collection_name = f"repo_{repo_hash}"
             
             # Store in vector database
-            vector_writer = VectorStoreWriter(
-                embedding_model=self.embedding_function,
-                collection_name=collection_name
-            )
+            # Load the existing collection first from the persistent client
+            import chromadb
+            client = chromadb.PersistentClient(path="./chroma_db")
+            self.collection = client.get_or_create_collection(name=collection_name)
             
-            # Write to vector store
-            self.collection = vector_writer.write(data_df)
+            # Now use the VectorStoreWriter with the existing collection
+            vector_writer = VectorStoreWriter(collection_name=collection_name)
+            vector_writer.upsert_dataframe(data_df)
+            
+            self.collection = vector_writer.collection
             logger.info(f"Repository data stored in collection: {collection_name}")
             
             # Update cache with the processed data
