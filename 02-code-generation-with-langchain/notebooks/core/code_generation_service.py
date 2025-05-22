@@ -23,7 +23,7 @@ from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHan
 from langchain.vectorstores import Chroma
 from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
-import chromadb
+from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
 
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
@@ -83,6 +83,7 @@ class CodeGenerationService(BaseGenerativeService):
         # The embedding_function will be initialized in load_context
         # or can be manually initialized by calling initialize_embedding_function
         self.embedding_function = None
+        self.chroma_embedding_function = None
         
         # Set default processing parameters
         self.default_batch_size = 20
@@ -137,9 +138,10 @@ class CodeGenerationService(BaseGenerativeService):
         
         # Import HuggingFaceEmbeddings
         try:
+            from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
             from langchain_huggingface import HuggingFaceEmbeddings
         except ImportError:
-            # Fall back to older import path
+            from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
             from langchain.embeddings import HuggingFaceEmbeddings
         
         # Determine which model path to use
@@ -151,8 +153,8 @@ class CodeGenerationService(BaseGenerativeService):
         
         # Initialize the embedding function
         self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
+        self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
         logger.info(f"Successfully initialized embedding function with model: {model_name}")
-        
         return self.embedding_function
     
     def extract_repository(self, repository_url: str, metadata_only: bool = False, 
@@ -496,12 +498,11 @@ class CodeGenerationService(BaseGenerativeService):
             
             # Store in vector database
             writer = VectorStoreWriter(
-                    collection_name=self.collection_name,
-                    verbose=False,
-                    embedding_model=self.embedding_function
-                )
+                collection_name=self.collection_name,
+                verbose=False,
+                embedding_model=self.chroma_embedding_function
+            )
             writer.upsert_dataframe(df)
-            
             # Update the collection reference and cache
             self.collection = writer.collection
             
@@ -585,7 +586,7 @@ class CodeGenerationService(BaseGenerativeService):
             try:
                 self.collection = client.get_or_create_collection(
                     name=self.collection_name,
-                    embedding_function=self.embedding_function
+                    embedding_function=self.chroma_embedding_function
                 )
                 logger.info(f"Collection '{self.collection_name}' loaded/created successfully")
             except Exception as col_err:
@@ -595,7 +596,7 @@ class CodeGenerationService(BaseGenerativeService):
             # Initialize LangChain vector store with the embedding function
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=self.embedding_function,
+                embedding_function=self.chroma_embedding_function,
                 collection_name=self.collection_name
             )
             self.retriever = self.vector_store.as_retriever()
@@ -605,7 +606,7 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Exception type: {type(e).__name__}")
             logger.info("Creating new empty vector store")
             # Use the embedding function that was already initialized in __init__
-            self.vector_store = Chroma(embedding_function=self.embedding_function)
+            self.vector_store = Chroma(embedding_function=self.chroma_embedding_function)
             self.retriever = self.vector_store.as_retriever()
             logger.info("Created new empty vector store")
     
