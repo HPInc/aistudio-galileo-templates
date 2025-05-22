@@ -209,24 +209,14 @@ class LLMContextUpdater:
         if self.print_prompt:
             self.logger.debug(f"\nPrompt for file {filename}:\n{rendered_prompt}\n{'=' * 60}")
 
-        # Process with timeout guard using concurrent.futures
         try:
-            # Invoke the LLM with the rendered prompt string, not the raw inputs dict
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.llm_chain.invoke, rendered_prompt)
-                response = future.result(timeout=self.item_timeout)
-                
-                # Update the context with the LLM response
-                if truncated:
-                    item['context'] = f"{response.strip()} (Note: analysis based on truncated file)"
-                else:
-                    item['context'] = response.strip()
-                self.logger.debug(f"Context updated for: {filename}")
-                
-        except concurrent.futures.TimeoutError:
-            self.logger.warning(f"Timeout ({self.item_timeout}s) for {filename}")
-            item['context'] = f"File: {filename} (LLM processing timed out after {self.item_timeout}s)"
-            raise
+            response = self.llm_chain.invoke(rendered_prompt)
+            # Update the context with the LLM response
+            if truncated:
+                item['context'] = f"{response.strip()} (Note: analysis based on truncated file)"
+            else:
+                item['context'] = response.strip()
+            self.logger.debug(f"Context updated for: {filename}")
         except httpcore.ConnectError as e:
             self.logger.error(f"Connection error on {filename}: {str(e)}")
             item['context'] = f"File: {filename} (Connection error: {str(e)[:50]})"

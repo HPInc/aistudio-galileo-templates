@@ -724,7 +724,7 @@ class CodeGenerationService(BaseGenerativeService):
                     n_batch=512,
                     n_ctx=context_window,
                     f16_kv=True,
-                    callback_manager=self.callback_manager,
+                    callback_manager=None,
                     verbose=False,
                     max_tokens=1024,
                     temperature=0.2
