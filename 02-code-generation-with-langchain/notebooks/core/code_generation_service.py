@@ -1016,10 +1016,39 @@ Question: {question}
                 
             # Create the specialized chain for repository-based code generation
             logger.info("Creating repository-based code generation chain")
-            self.repository_chain = {
-                "context": get_formatted_context,
-                "question": RunnablePassthrough()
-            } | self.code_description_prompt | self.llm | StrOutputParser()
+            
+            # This function extracts code and filename from the first document retrieved for the description prompt
+            def extract_code_info_from_docs(inputs):
+                # Get retrieval query (could be "query" or "question" depending on input)
+                query = inputs.get("query", inputs.get("question", ""))
+                
+                # Get documents using shared retriever
+                docs = self.custom_retriever(query)
+                
+                if not docs or len(docs) == 0:
+                    # If no documents found, return empty values
+                    return {
+                        "code": "No code found",
+                        "filename": "No filename found",
+                        "context": "No relevant documents retrieved"
+                    }
+                
+                # Extract code and filename from the first (most relevant) document
+                doc = docs[0]
+                code = doc.page_content
+                filename = doc.metadata.get("filename", "unknown_file")
+                
+                # Format the rest of the documents as context
+                remaining_docs = docs[1:] if len(docs) > 1 else []
+                context = format_docs_with_adaptive_context(remaining_docs, context_window=context_window) if remaining_docs else ""
+                
+                return {
+                    "code": code,
+                    "filename": filename,
+                    "context": context
+                }
+            
+            self.repository_chain = extract_code_info_from_docs | self.code_description_prompt | self.llm | StrOutputParser()
             
             # Create a direct code generation chain without repository context
             logger.info("Creating direct code generation chain")
