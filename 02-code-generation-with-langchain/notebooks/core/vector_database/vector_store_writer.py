@@ -5,17 +5,28 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class VectorStoreWriter:
-    def __init__(self, collection_name="my_collection", verbose=False):
+    def __init__(self, collection_name="my_collection", verbose=False, embedding_model=None):
         """
         Initializes a ChromaDB collection.
 
         :param collection_name: Name of the collection to upsert data into
         :param verbose: If True, log detailed info for each record
+        :param embedding_model: Optional embedding model to use with ChromaDB (if supported)
         """
         self.verbose = verbose
+        self.embedding_model = embedding_model
         self.client = chromadb.Client()
-        self.collection = self.client.get_or_create_collection(name=collection_name)
-        logger.info(f"ChromaDB collection '{collection_name}' initialized.")
+        # Try to use embedding_model if provided and supported by ChromaDB
+        collection_kwargs = {"name": collection_name}
+        if embedding_model is not None:
+            collection_kwargs["embedding_function"] = embedding_model
+        try:
+            self.collection = self.client.get_or_create_collection(**collection_kwargs)
+            logger.info(f"ChromaDB collection '{collection_name}' initialized with embedding_model: {embedding_model is not None}.")
+        except TypeError:
+            # Fallback for older ChromaDB versions
+            self.collection = self.client.get_or_create_collection(name=collection_name)
+            logger.info(f"ChromaDB collection '{collection_name}' initialized (embedding_model not used).")
 
     def upsert_dataframe(self, df):
         """
