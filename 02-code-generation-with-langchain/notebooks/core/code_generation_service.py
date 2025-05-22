@@ -201,7 +201,7 @@ class CodeGenerationService(BaseGenerativeService):
         
         context_params = {
             "llm_chain": self.llm if hasattr(self, 'llm') else None,
-            "prompt_template": self._get_metadata_prompt_template(),
+            "prompt_template": self.code_description_prompt,
             "verbose": False,
             "item_timeout": 30,
             "max_retries": 2,
@@ -486,23 +486,6 @@ Question: {question}
         self.code_description_prompt = ChatPromptTemplate.from_template(self.code_description_template)
         self.code_generation_prompt = ChatPromptTemplate.from_template(self.code_generation_template)
     
-    def format_docs(self, docs: List[Document], context_window: int = None) -> str:
-        """
-        Format a list of documents into a single string
-        
-        Args:
-            docs: List of Document objects
-            context_window: Size of the model's context window in tokens (optional)
-            
-        Returns:
-            Formatted string of document contents optimized for the context window
-        """
-        # Use the utility function if context window is provided
-        if context_window:
-            return format_docs_with_adaptive_context(docs, context_window=context_window)
-        # Fall back to simple concatenation if no context window info available
-        return "\n\n".join([doc.page_content for doc in docs])
-    
     def load_chain(self) -> None:
         """Create the code generation chains using the loaded model, prompts, and retriever."""
         try:
@@ -529,7 +512,7 @@ Question: {question}
             # Create the context formatter function with adaptive formatting
             def get_formatted_context(inputs):
                 # Get retrieval query (could be "query" or "question" depending on input)
-                query = inputs.get("query", inputs.get("question", ""))
+                query = inputs.get("question", "")
                 
                 # Get documents using shared retriever
                 docs = self.custom_retriever(query)
@@ -686,7 +669,7 @@ Question: {question}
             return pd.DataFrame([{"result": "Error: No question provided for code generation."}])
         
         try:
-            logger.info(f"Processing code generation request for question: {str(question)}...")
+            logger.info(f"Processing code generation request for question: {str(question)}")
             logger.info(f"Parameters: metadata_only={metadata_only}, timeout={process_timeout}s, batch_size={batch_size}")
             
             # If repository_url is provided, process it first
@@ -760,6 +743,7 @@ Question: {question}
                             logger.info(f"Collection '{self.collection_name}' has {count} documents")
                             
                             # Use the repository chain with the question
+                            # TODO: Is this chain input correct? Does it match with the prompt template?
                             chain_input = {"question": question, "query": question}
                             logger.info(f"Using repository chain with input: {chain_input}")
                             
@@ -792,11 +776,6 @@ Question: {question}
                             }
                         except Exception as count_error:
                             logger.warning(f"Could not access collection: {str(count_error)}")
-                            # Fall back to direct generation
-                            result = self.direct_chain.invoke(
-                                {"question": question},
-                                config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
-                            )
                             processing_info = {
                                 "processing_time_seconds": processing_time,
                                 "metadata_only": metadata_only,
@@ -805,11 +784,7 @@ Question: {question}
                             }
                     else:
                         # If no collection is available, fall back to direct generation
-                        logger.warning("No collection available, falling back to direct generation")
-                        result = self.direct_chain.invoke(
-                            {"question": question},
-                            config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
-                        )
+                        logger.warning("No collection available")
                         processing_info = {
                             "processing_time_seconds": processing_time,
                             "metadata_only": metadata_only,
@@ -818,11 +793,6 @@ Question: {question}
                         }
                 except Exception as repo_error:
                     logger.error(f"Error processing repository: {str(repo_error)}")
-                    # Fall back to direct generation
-                    result = self.direct_chain.invoke(
-                        {"question": question},
-                        config={"callbacks": [self.prompt_handler] if hasattr(self, 'prompt_handler') else None}
-                    )
                     processing_info = {
                         "error": f"repository_processing_failed: {str(repo_error)[:100]}",
                         "repository_url": repository_url,
@@ -1020,27 +990,7 @@ Question: {question}
             if repository_url in self.repository_cache:
                 logger.info(f"Repository {repository_url} found in cache, activating")
                 self.collection = self.repository_cache[repository_url]["collection"]
-            # Repository isn't in cache yet - it will be processed and added later
     
-    def _get_metadata_prompt_template(self):
-        """Get the prompt template for metadata generation"""
-        from langchain_core.prompts import PromptTemplate
-        template = """
-        You will receive three pieces of information: a code snippet, a file name, and an optional context. Based on this information, explain in a clear, summarized and concise way what the code snippet is doing.
-
-        Code:
-        {code}
-
-        File name:
-        {filename}
-
-        Context:
-        {context}
-
-        Describe what the code above does.
-        """
-        return PromptTemplate.from_template(template)
-        
     def _on_repository_complete(self, repo_id: str, data: List[Dict[str, Any]]) -> None:
         """
         Callback for when repository processing completes.
@@ -1146,7 +1096,7 @@ Question: {question}
                 "data": valid_data,
                 "collection": self.collection,
                 "timestamp": time.time(),
-                "metadata_only": False  # We always do full processing with async
+                "metadata_only": False 
             }
             
             # Update LangChain retriever from the collection
