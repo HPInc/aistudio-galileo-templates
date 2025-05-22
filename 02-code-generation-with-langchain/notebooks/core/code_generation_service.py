@@ -1359,40 +1359,80 @@ Question: {question}
             data: Processed data with context and embeddings
         """
         try:
-            # Convert to format expected by vector store
-            df_converter = DataFrameConverter()
-            data_df = df_converter.to_dataframe(data)
+            # Ensure data has valid embeddings before processing
+            logger.info(f"Validating embeddings for {len(data)} items")
+            
+            # First, ensure all items have valid embeddings
+            valid_data = []
+            default_embedding_dim = 384  # Default dimension for all-MiniLM-L6-v2
+            for item in data:
+                # Check if embedding exists and is valid
+                if "embedding" not in item or item["embedding"] is None or (
+                    isinstance(item["embedding"], list) and (
+                        len(item["embedding"]) == 0 or 
+                        any(e is None for e in item["embedding"])
+                    )):
+                    logger.warning(f"Invalid or missing embedding for item {item.get('id', 'unknown')} - replacing with zeros")
+                    item["embedding"] = [0.0] * default_embedding_dim
+                valid_data.append(item)
+            
+            # Convert to DataFrame using robust DataFrameConverter
+            df_converter = DataFrameConverter(verbose=True)
+            data_df = df_converter.to_dataframe(valid_data)
             
             # Create a unique collection name for this repository to avoid collisions
             import hashlib
             repo_hash = hashlib.md5(repository_url.encode()).hexdigest()[:8]
             collection_name = f"repo_{repo_hash}"
             
-            # Store in vector database
-            # Load the existing collection first from the persistent client
+            # Set up the persistent directory
+            persist_dir = "./chroma_db"
+            import os
+            os.makedirs(persist_dir, exist_ok=True)
+            
+            # Initialize the ChromaDB client and collection
+            logger.info(f"Initializing ChromaDB persistent client at {persist_dir}")
             import chromadb
-            client = chromadb.PersistentClient(path="./chroma_db")
+            client = chromadb.PersistentClient(path=persist_dir)
+            
+            # Get or create the collection - do not pass embedding function here
             self.collection = client.get_or_create_collection(name=collection_name)
             
-            # Now use the VectorStoreWriter with the existing collection
-            vector_writer = VectorStoreWriter(collection_name=collection_name)
+            # Use VectorStoreWriter for robust upsert with error handling
+            logger.info(f"Upserting data to collection {collection_name}")
+            vector_writer = VectorStoreWriter(collection_name=collection_name, verbose=True)
+            vector_writer.collection = self.collection  # Use our existing collection
             vector_writer.upsert_dataframe(data_df)
             
+            # Save the collection reference for later use
             self.collection = vector_writer.collection
-            logger.info(f"Repository data stored in collection: {collection_name}")
+            logger.info(f"Repository data stored in collection: {collection_name} with {len(data)} items")
             
             # Update cache with the processed data
             self.repository_cache[repository_url] = {
-                "data": data,
+                "data": valid_data,
                 "collection": self.collection,
                 "timestamp": time.time(),
                 "metadata_only": False  # We always do full processing with async
             }
             
-            # Update retriever
-            self.retriever = self.collection.as_retriever()
-            logger.info(f"Updated retriever for collection: {collection_name}")
+            # Update LangChain retriever from the collection
+            try:
+                from langchain.vectorstores import Chroma
+                self.vector_store = Chroma(
+                    client=client,
+                    collection_name=collection_name
+                )
+                self.retriever = self.vector_store.as_retriever()
+                logger.info(f"Updated LangChain retriever for collection: {collection_name}")
+            except Exception as ret_err:
+                logger.error(f"Error creating retriever: {str(ret_err)}")
+                # Fall back to using the collection directly for retrieval
+                self.retriever = self.collection
+                logger.info("Falling back to using collection directly for retrieval")
             
         except Exception as e:
             logger.error(f"Error storing repository data in vector DB: {str(e)}")
-            raise
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Don't raise the exception to allow graceful degradation
+            # Instead, log the error and return without updating the collection

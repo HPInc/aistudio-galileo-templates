@@ -39,23 +39,72 @@ class VectorStoreWriter:
 
         :param df: DataFrame with 'ids', 'code', 'metadatas', 'embeddings' columns
         """
-        ids = df["ids"].tolist()
-        documents = df["code"].tolist()
-        metadatas = df["metadatas"].tolist()
-        embeddings = df["embeddings"].tolist()
+        # Validate that we have the required columns
+        required_columns = ["ids", "code", "metadatas", "embeddings"]
+        for col in required_columns:
+            if col not in df.columns:
+                logger.error(f"Missing required column '{col}' in DataFrame")
+                raise ValueError(f"DataFrame must have '{col}' column")
+
+        # Check for None values in embeddings and filter/replace them
+        default_embedding = [0.0] * 384  # Default dimension for all-MiniLM-L6-v2
+        valid_indices = []
+        
+        # Create lists for valid data
+        valid_ids = []
+        valid_documents = []
+        valid_metadatas = []
+        valid_embeddings = []
+        
+        # Process each row and filter out invalid entries
+        for i, row in df.iterrows():
+            embedding = row["embeddings"]
+            if embedding is None or (isinstance(embedding, list) and (len(embedding) == 0 or any(e is None for e in embedding))):
+                logger.warning(f"Invalid embedding for ID {row['ids']} - replacing with zeros")
+                embedding = default_embedding
+            
+            # Add valid data to our lists
+            valid_ids.append(str(row["ids"]))  # Ensure IDs are strings
+            valid_documents.append(row["code"])
+            valid_metadatas.append(row["metadatas"])
+            valid_embeddings.append(embedding)
+        
+        # If no valid data after filtering, return
+        if not valid_ids:
+            logger.warning("No valid data after filtering - skipping upsert")
+            return
 
         if self.verbose:
-            for i in range(len(ids)):
-                logger.info(f"[UPDATING] ID: {ids[i]}")
-                logger.info(f"[UPDATING] Document: {documents[i]}")
-                logger.info(f"[UPDATING] Metadata: {metadatas[i]}")
-                logger.info(f"[UPDATING] Embedding: {embeddings[i]}\n")
+            for i in range(len(valid_ids)):
+                logger.info(f"[UPDATING] ID: {valid_ids[i]}")
+                logger.info(f"[UPDATING] Document: {valid_documents[i]}")
+                logger.info(f"[UPDATING] Metadata: {valid_metadatas[i]}")
+                logger.info(f"[UPDATING] Embedding: {valid_embeddings[i][:5]}...\n")  # Show only first 5 values
 
-        self.collection.upsert(
-            documents=documents,
-            ids=ids,
-            metadatas=metadatas,
-            embeddings=embeddings
-        )
+        # Log the shapes for debugging
+        logger.info(f"Upserting {len(valid_ids)} documents")
+        
+        try:
+            self.collection.upsert(
+                documents=valid_documents,
+                ids=valid_ids,
+                metadatas=valid_metadatas,
+                embeddings=valid_embeddings
+            )
+            logger.info("✅ Documents upserted successfully into ChromaDB.")
+        except Exception as e:
+            logger.error(f"Failed to upsert documents: {str(e)}")
+            # Try again without embeddings if there's an error
+            try:
+                logger.warning("Attempting to upsert without embeddings (ChromaDB will generate them)")
+                self.collection.upsert(
+                    documents=valid_documents,
+                    ids=valid_ids,
+                    metadatas=valid_metadatas
+                )
+                logger.info("✅ Documents upserted successfully without embeddings.")
+            except Exception as e2:
+                logger.error(f"Failed again: {str(e2)}")
+                raise
 
         logger.info("✅ Documents upserted successfully into ChromaDB.")
