@@ -46,10 +46,35 @@ class ChromaEmbeddingAdapter:
         Returns:
             List of embedding vectors (as lists of floats)
         """
+        if not input:
+            logger.warning("Empty input provided to ChromaEmbeddingAdapter. Returning empty list.")
+            return []
+            
+        # Create a fallback embedding of correct dimension (all zeros)
+        default_embedding_dim = 384  # Default dimension for all-MiniLM-L6-v2
+        default_embedding = [0.0] * default_embedding_dim
+        
         try:
             # Call the underlying embedding model's embed_documents method
             embeddings = self.embedding_model.embed_documents(input)
-            return embeddings
+            
+            # Validate the returned embeddings
+            if embeddings is None or len(embeddings) == 0:
+                logger.warning("Embedding model returned None or empty list. Using zeros.")
+                return [default_embedding] * len(input)
+                
+            # Check for None values in any of the embeddings
+            valid_embeddings = []
+            for i, emb in enumerate(embeddings):
+                if emb is None or len(emb) == 0 or any(val is None for val in emb):
+                    logger.warning(f"Invalid embedding at index {i}. Using zeros.")
+                    valid_embeddings.append(default_embedding)
+                else:
+                    valid_embeddings.append(emb)
+                    
+            return valid_embeddings
         except Exception as e:
             logger.error(f"Error in ChromaEmbeddingAdapter.__call__: {str(e)}")
-            raise
+            # Return default embeddings instead of raising
+            logger.warning(f"Returning default embeddings for {len(input)} inputs")
+            return [default_embedding] * len(input)

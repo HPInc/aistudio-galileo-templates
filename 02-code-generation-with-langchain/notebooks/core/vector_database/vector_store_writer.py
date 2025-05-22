@@ -18,11 +18,22 @@ class VectorStoreWriter:
         
         # Use PersistentClient for consistency with other code
         persist_dir = "./chroma_db"
-        self.client = chromadb.PersistentClient(path=persist_dir)
+        import os
+        os.makedirs(persist_dir, exist_ok=True)
         
-        # Try to use embedding_model if provided and supported by ChromaDB
+        try:
+            self.client = chromadb.PersistentClient(path=persist_dir)
+            logger.info(f"ChromaDB client initialized with persistent storage at {persist_dir}")
+        except Exception as e:
+            logger.warning(f"Error creating persistent client: {str(e)}, trying in-memory client")
+            self.client = chromadb.Client()
+            logger.info("Using in-memory client as fallback")
+        
+        # Collection configuration
         collection_kwargs = {"name": collection_name}
-        # Don't pass the embedding_function to avoid ChromaDB interface issues
+        
+        # Handle embedding function differently - don't pass to ChromaDB directly
+        # This avoids interface incompatibilities between LangChain and ChromaDB
         
         try:
             self.collection = self.client.get_or_create_collection(**collection_kwargs)

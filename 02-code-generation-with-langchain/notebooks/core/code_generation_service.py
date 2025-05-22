@@ -537,7 +537,54 @@ class CodeGenerationService(BaseGenerativeService):
             retrieval_source = self.vector_store
         elif self.collection:
             logger.info("Using direct collection for retrieval")
-            retrieval_source = self.collection
+            # We can't use the collection directly if we don't have an embedding function
+            # Try to create a proper vector store first
+            try:
+                import chromadb
+                from langchain_community.vectorstores import Chroma
+                
+                # Ensure we have embedding function
+                if self.embedding_function is None or self.chroma_embedding_function is None:
+                    logger.warning("Missing embedding function. Initializing default embedding model.")
+                    self.initialize_embedding_function()
+                
+                # Create a vector store with the proper embedding function
+                client = chromadb.get_client()
+                self.vector_store = Chroma(
+                    client=client,
+                    collection_name=self.collection_name,
+                    embedding_function=self.chroma_embedding_function
+                )
+                retrieval_source = self.vector_store
+                logger.info("Created vector store from collection for retrieval")
+            except Exception as vs_err:
+                logger.error(f"Failed to create vector store from collection: {str(vs_err)}")
+                # We'll try a different approach below
+                pass
+                
+            if not self.vector_store:
+                # We couldn't create a proper vector store, use a special approach for direct collection
+                logger.warning("Using direct collection for retrieval - this requires custom handling")
+                try:
+                    # Try to directly query the collection using embedding function
+                    embedding_vector = self.embedding_function.embed_query(query)
+                    results = self.collection.query(
+                        query_embeddings=[embedding_vector],
+                        n_results=top_n or 10,
+                        include=["documents", "metadatas", "distances"]
+                    )
+                    
+                    # Convert ChromaDB results to LangChain Document objects
+                    documents = []
+                    for i, doc in enumerate(results["documents"][0]):
+                        metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
+                        documents.append(Document(page_content=doc, metadata=metadata))
+                    
+                    logger.info(f"Retrieved {len(documents)} documents directly from collection")
+                    return documents
+                except Exception as direct_err:
+                    logger.error(f"Error with direct collection retrieval: {str(direct_err)}")
+                    return []
         else:
             logger.error("No retrieval source available (neither vector_store nor collection)")
             return []
@@ -552,6 +599,7 @@ class CodeGenerationService(BaseGenerativeService):
                 context_window = get_context_window(self.llm)
                 logger.info(f"Retrieved model context window: {context_window} tokens")
             
+            # Use the dynamic retriever with the proper retrieval source
             documents = dynamic_retriever(
                 query=query, 
                 collection=retrieval_source, 
@@ -565,6 +613,29 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Error retrieving documents: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Traceback: {traceback.format_exc()}")
+            
+            # Final fallback - try a direct query if everything else fails
+            if self.collection and self.embedding_function:
+                try:
+                    logger.info("Trying direct collection query as final fallback")
+                    embedding_vector = self.embedding_function.embed_query(query)
+                    results = self.collection.query(
+                        query_embeddings=[embedding_vector],
+                        n_results=top_n or 10,
+                        include=["documents", "metadatas"]
+                    )
+                    
+                    # Convert ChromaDB results to LangChain Document objects
+                    documents = []
+                    for i, doc in enumerate(results["documents"][0]):
+                        metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
+                        documents.append(Document(page_content=doc, metadata=metadata))
+                    
+                    logger.info(f"Fallback retrieved {len(documents)} documents")
+                    return documents
+                except Exception as fb_err:
+                    logger.error(f"Fallback retrieval also failed: {str(fb_err)}")
+            
             return []
     
     def load_vector_store(self, persist_directory="./chroma_db"):
@@ -577,7 +648,17 @@ class CodeGenerationService(BaseGenerativeService):
         try:
             logger.info(f"Loading vector store from {persist_directory}")
             
+            # Ensure the embedding function is initialized
+            if self.embedding_function is None:
+                logger.warning("No embedding function available. Initializing default embedding function.")
+                self.initialize_embedding_function()
+                
+            # Make sure directory exists
+            import os
+            os.makedirs(persist_directory, exist_ok=True)
+            
             # Initialize chromadb client
+            import chromadb
             client = chromadb.PersistentClient(path=persist_directory)
             
             # Try to get existing collection or create a new one
@@ -590,13 +671,15 @@ class CodeGenerationService(BaseGenerativeService):
                 logger.error(f"Error getting/creating collection: {str(col_err)}")
                 logger.error(f"Exception type: {type(col_err).__name__}")
             
-            # Initialize LangChain vector store
+            # Initialize LangChain vector store - IMPORTANT: pass the embedding function
+            from langchain_community.vectorstores import Chroma
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
-                collection_name=self.collection_name
+                collection_name=self.collection_name,
+                embedding_function=self.chroma_embedding_function  # Pass the embedding adapter to fix the retrieval issue
             )
             self.retriever = self.vector_store.as_retriever()
-            logger.info(f"Vector store successfully loaded from {persist_directory}")
+            logger.info(f"Vector store successfully loaded from {persist_directory} with embedding function")
         except Exception as e:
             logger.error(f"Error loading vector store: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
@@ -1362,11 +1445,30 @@ Question: {question}
             # Ensure data has valid embeddings before processing
             logger.info(f"Validating embeddings for {len(data)} items")
             
-            # First, ensure all items have valid embeddings
+            # Debug the data to understand embedding issues
+            has_proper_embeddings = False
+            for idx, item in enumerate(data[:3]):  # Check first few items
+                embedding = item.get("embedding", None)
+                if embedding and isinstance(embedding, list) and len(embedding) > 0 and embedding[0] != 0.0:
+                    has_proper_embeddings = True
+                    logger.info(f"Sample valid embedding found: Length={len(embedding)}, First few values: {embedding[:5]}")
+                    break
+            
+            if not has_proper_embeddings:
+                logger.warning("No proper embeddings found in data. Will regenerate embeddings if possible.")
+                
+                # Try to regenerate embeddings if we have an embedding model
+                if self.embedding_function is not None:
+                    logger.info("Regenerating embeddings using the embedding model")
+                    embedding_updater = EmbeddingUpdater(embedding_model=self.embedding_function, verbose=True)
+                    data = embedding_updater.update(data)
+                    logger.info("Embeddings regenerated successfully")
+                    
+            # Now validate and fill in any remaining missing embeddings
             valid_data = []
             default_embedding_dim = 384  # Default dimension for all-MiniLM-L6-v2
             for item in data:
-                # Check if embedding exists and is valid
+                # Only replace embeddings if necessary
                 if "embedding" not in item or item["embedding"] is None or (
                     isinstance(item["embedding"], list) and (
                         len(item["embedding"]) == 0 or 
@@ -1416,20 +1518,35 @@ Question: {question}
                 "metadata_only": False  # We always do full processing with async
             }
             
-            # Update LangChain retriever from the collection
+            # Update LangChain retriever from the collection - IMPORTANT: pass embedding_function
             try:
-                from langchain.vectorstores import Chroma
+                from langchain_community.vectorstores import Chroma
                 self.vector_store = Chroma(
                     client=client,
-                    collection_name=collection_name
+                    collection_name=collection_name,
+                    embedding_function=self.chroma_embedding_function  # Pass the embedding function!
                 )
                 self.retriever = self.vector_store.as_retriever()
-                logger.info(f"Updated LangChain retriever for collection: {collection_name}")
+                logger.info(f"Updated LangChain retriever for collection: {collection_name} with embedding function")
             except Exception as ret_err:
                 logger.error(f"Error creating retriever: {str(ret_err)}")
-                # Fall back to using the collection directly for retrieval
-                self.retriever = self.collection
-                logger.info("Falling back to using collection directly for retrieval")
+                
+                # Try again with a different approach
+                try:
+                    from langchain_community.vectorstores import Chroma
+                    # Try direct path-based initialization
+                    self.vector_store = Chroma(
+                        persist_directory=persist_dir,
+                        collection_name=collection_name,
+                        embedding_function=self.chroma_embedding_function
+                    )
+                    self.retriever = self.vector_store.as_retriever()
+                    logger.info("Successfully created retriever with alternate method")
+                except Exception as alt_err:
+                    logger.error(f"Alternative retriever creation also failed: {str(alt_err)}")
+                    # Fall back to using the collection directly for retrieval
+                    self.retriever = self.collection
+                    logger.info("Falling back to using collection directly for retrieval")
             
         except Exception as e:
             logger.error(f"Error storing repository data in vector DB: {str(e)}")
