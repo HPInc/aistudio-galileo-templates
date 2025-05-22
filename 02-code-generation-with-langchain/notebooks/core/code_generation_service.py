@@ -24,13 +24,14 @@ from langchain_community.vectorstores import Chroma
 from langchain.schema.runnable import RunnablePassthrough
 from galileo_protect import ProtectParser
 from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
+import chromadb
 
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Add the src directory to the path to import base_service
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from src.service.base_service import BaseGenerativeService
-from src.utils import get_context_window, dynamic_retriever, format_docs_with_adaptive_context, clean_code
+from src.utils import get_context_window, dynamic_retriever, format_docs_with_adaptive_context, clean_code, get_model_context_window
 
 # Add core directory to path for local imports
 core_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -235,85 +236,23 @@ class CodeGenerationService(BaseGenerativeService):
         """
         # Determine whether to use the vector_store or collection
         retrieval_source = None
-        if self.vector_store:
-            logger.info("Using vector_store for retrieval")
-            # Check if the vector store has a properly set embedding function
-            try:
-                if not hasattr(self.vector_store._embedding_function, 'embed_query'):
-                    logger.warning("Vector store has invalid embedding function - reinitializing")
-                    # Recreate the vector store with proper embedding function
-                    self.vector_store = Chroma(
-                        collection_name=self.collection_name,
-                        persist_directory="./chroma_db",
-                        embedding_function=self.chroma_embedding_function
-                    )
-                    logger.info("Vector store reinitialized with proper embedding function")
-            except Exception as vs_err:
-                logger.error(f"Failed to check/fix vector store embedding function: {str(vs_err)}")
-            
-            retrieval_source = self.vector_store
-        elif self.collection:
-            logger.info("Using direct collection for retrieval")
-            # We can't use the collection directly if we don't have an embedding function
-            # Try to create a proper vector store first
-            try:
-                import chromadb
-
-                # Ensure we have embedding function
-                if self.embedding_function is None or self.chroma_embedding_function is None:
-                    logger.warning("Missing embedding function. Initializing default embedding model.")
-                    self.initialize_embedding_function()
-                
-                # Create a vector store with the proper embedding function
-                # Make sure to use PersistentClient to maintain consistency
-                persist_dir = "./chroma_db"
-                import os
-                os.makedirs(persist_dir, exist_ok=True)
-                client = chromadb.PersistentClient(path=persist_dir)
-                
+        logger.info("Using vector_store for retrieval")
+        # Check if the vector store has a properly set embedding function
+        try:
+            if not hasattr(self.vector_store._embedding_function, 'embed_query'):
+                logger.warning("Vector store has invalid embedding function - reinitializing")
+                # Recreate the vector store with proper embedding function
                 self.vector_store = Chroma(
-                    client=client,
                     collection_name=self.collection_name,
+                    persist_directory="./chroma_db",
                     embedding_function=self.chroma_embedding_function
                 )
-                retrieval_source = self.vector_store
-                logger.info("Created vector store from collection for retrieval")
-            except Exception as vs_err:
-                logger.error(f"Failed to create vector store from collection: {str(vs_err)}")
-                # We'll try a different approach below
-                pass
-                
-            if not self.vector_store:
-                # We couldn't create a proper vector store, use a special approach for direct collection
-                logger.warning("Using direct collection for retrieval - this requires custom handling")
-                try:
-                    # Try to directly query the collection using embedding function
-                    if not hasattr(self.embedding_function, 'embed_query'):
-                        logger.warning("Embedding function missing embed_query - reinitializing")
-                        self.initialize_embedding_function()
-                    
-                    embedding_vector = self.embedding_function.embed_query(query)
-                    results = self.collection.query(
-                        query_embeddings=[embedding_vector],
-                        n_results=top_n or 10,
-                        include=["documents", "metadatas", "distances"]
-                    )
-                    
-                    # Convert ChromaDB results to LangChain Document objects
-                    documents = []
-                    for i, doc in enumerate(results["documents"][0]):
-                        metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
-                        documents.append(Document(page_content=doc, metadata=metadata))
-                    
-                    logger.info(f"Retrieved {len(documents)} documents directly from collection")
-                    return documents
-                except Exception as direct_err:
-                    logger.error(f"Error with direct collection retrieval: {str(direct_err)}")
-                    return []
-        else:
-            logger.error("No retrieval source available (neither vector_store nor collection)")
-            return []
+                logger.info("Vector store reinitialized with proper embedding function")
+        except Exception as vs_err:
+            logger.error(f"Failed to check/fix vector store embedding function: {str(vs_err)}")
         
+        retrieval_source = self.vector_store
+
         try:
             # Use class-level context window if available, or get from model
             context_window = None
@@ -326,9 +265,9 @@ class CodeGenerationService(BaseGenerativeService):
             
             # Use the dynamic retriever with the proper retrieval source
             documents = dynamic_retriever(
-                query=query, 
-                collection=retrieval_source, 
-                top_n=top_n, 
+                query=query,
+                collection=retrieval_source,
+                top_n=top_n,
                 context_window=context_window
             )
             
@@ -338,30 +277,6 @@ class CodeGenerationService(BaseGenerativeService):
             logger.error(f"Error retrieving documents: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Traceback: {traceback.format_exc()}")
-            
-            # Final fallback - try a direct query if everything else fails
-            if self.collection and self.embedding_function:
-                try:
-                    logger.info("Trying direct collection query as final fallback")
-                    embedding_vector = self.embedding_function.embed_query(query)
-                    results = self.collection.query(
-                        query_embeddings=[embedding_vector],
-                        n_results=top_n or 10,
-                        include=["documents", "metadatas"]
-                    )
-                    
-                    # Convert ChromaDB results to LangChain Document objects
-                    documents = []
-                    for i, doc in enumerate(results["documents"][0]):
-                        metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
-                        documents.append(Document(page_content=doc, metadata=metadata))
-                    
-                    logger.info(f"Fallback retrieved {len(documents)} documents")
-                    return documents
-                except Exception as fb_err:
-                    logger.error(f"Fallback retrieval also failed: {str(fb_err)}")
-            
-            return []
     
     def load_vector_store(self, persist_directory="./chroma_db"):
         """
@@ -377,7 +292,6 @@ class CodeGenerationService(BaseGenerativeService):
             os.makedirs(persist_directory, exist_ok=True)
             
             # Initialize chromadb client
-            import chromadb
             client = chromadb.PersistentClient(path=persist_directory)
             
             # Try to get existing collection or create a new one
@@ -390,22 +304,17 @@ class CodeGenerationService(BaseGenerativeService):
                 logger.error(f"Error getting/creating collection: {str(col_err)}")
                 logger.error(f"Exception type: {type(col_err).__name__}")
             
-            # Initialize LangChain vector store - IMPORTANT: pass the embedding function
+            # Initialize LangChain vector store
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
                 collection_name=self.collection_name,
-                embedding_function=self.chroma_embedding_function  # Pass the embedding adapter to fix the retrieval issue
+                embedding_function=self.chroma_embedding_function
             )
             self.retriever = self.vector_store.as_retriever()
             logger.info(f"Vector store successfully loaded from {persist_directory} with embedding function")
         except Exception as e:
             logger.error(f"Error loading vector store: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
-            logger.info("Creating new empty vector store")
-            # Use the embedding function that was already initialized in __init__
-            self.vector_store = Chroma()
-            self.retriever = self.vector_store.as_retriever()
-            logger.info("Created new empty vector store")
     
     def load_model(self, context) -> None:
         """
@@ -415,23 +324,6 @@ class CodeGenerationService(BaseGenerativeService):
             context: MLflow model context containing artifacts
         """
         try:
-            # Ensure embedding model is initialized before loading LLM (critical for CUDA library loading)
-            logger.info("Ensuring embedding model is initialized before loading LLM")
-            if hasattr(self, 'embedding_function') and self.embedding_function is not None:
-                logger.info("Using existing embedding function instance")
-            else:
-                logger.warning("Embedding function not initialized yet, initializing now")
-                # Try to use embedding model path from artifacts if available
-                embedding_model_path = None
-                if "embedding_model" in context.artifacts:
-                    embedding_model_path = context.artifacts["embedding_model"]
-                    if os.path.exists(embedding_model_path):
-                        logger.info(f"Using embedding model from artifacts: {embedding_model_path}")
-                
-                # Initialize embedding function
-                self.initialize_embedding_function(embedding_model_path)
-            
-            # Now proceed with loading the LLM model
             model_source = self.model_config.get("model_source", "local")
             logger.info(f"Attempting to load model from source: {model_source}")
             
@@ -489,12 +381,11 @@ class CodeGenerationService(BaseGenerativeService):
             self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
             
             # Determine optimal context window for this model using the utility function
-            from src.utils import get_model_context_window
             
             # Create a temporary model object with model_path attribute
             temp_model = type('TempModel', (), {'model_path': model_path})
             
-            # Get context window using the utility function (handles lookup in MODEL_CONTEXT_WINDOWS)
+            # Get context window using the utility function
             context_window = get_model_context_window(temp_model)
             logger.info(f"Determined context window: {context_window} tokens")
             
@@ -1235,7 +1126,6 @@ Question: {question}
             
             # Initialize the ChromaDB client and collection
             logger.info(f"Initializing ChromaDB persistent client at {persist_dir}")
-            import chromadb
             client = chromadb.PersistentClient(path=persist_dir)
             
             # Get or create the collection - do not pass embedding function here
