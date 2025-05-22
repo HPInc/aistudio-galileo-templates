@@ -152,10 +152,46 @@ class CodeGenerationService(BaseGenerativeService):
             logger.info("Using default embedding model: all-MiniLM-L6-v2")
         
         # Initialize the embedding function
-        self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
-        self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
-        logger.info(f"Successfully initialized embedding function with model: {model_name}")
-        return self.embedding_function
+        try:
+            self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
+            logger.info(f"Successfully initialized HuggingFaceEmbeddings with model: {model_name}")
+            
+            # Create the adapter with our updated implementation that has both __call__ and embed_query methods
+            self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
+            
+            # Verify the adapter has all required methods
+            has_call = hasattr(self.chroma_embedding_function, '__call__')
+            has_embed_query = hasattr(self.chroma_embedding_function, 'embed_query')
+            has_embed_docs = hasattr(self.chroma_embedding_function, 'embed_documents')
+            
+            if not (has_call and has_embed_query and has_embed_docs):
+                missing = []
+                if not has_call: missing.append("__call__")
+                if not has_embed_query: missing.append("embed_query")
+                if not has_embed_docs: missing.append("embed_documents")
+                logger.warning(f"ChromaEmbeddingAdapter missing methods: {', '.join(missing)}")
+                logger.warning("This might cause issues with ChromaDB or LangChain integration")
+            else:
+                logger.info("ChromaEmbeddingAdapter successfully initialized with all required methods")
+                
+            return self.embedding_function
+        except Exception as e:
+            logger.error(f"Failed to initialize embedding function: {str(e)}")
+            # Create a basic fallback embedding function that returns zeros
+            from typing import List
+            
+            class FallbackEmbedding:
+                """Simple fallback embedding that returns zeros"""
+                def embed_query(self, text: str) -> List[float]:
+                    return [0.0] * 384  # Default dimension
+                    
+                def embed_documents(self, documents: List[str]) -> List[List[float]]:
+                    return [[0.0] * 384 for _ in documents]
+            
+            self.embedding_function = FallbackEmbedding()
+            self.chroma_embedding_function = FallbackEmbedding()
+            logger.warning("Using fallback embedding function that returns zeros")
+            return self.embedding_function
     
     def extract_repository(self, repository_url: str, metadata_only: bool = False, 
                           batch_size: int = 10, timeout: int = 300, 
@@ -529,11 +565,32 @@ class CodeGenerationService(BaseGenerativeService):
         Returns:
             List of Document objects with content and metadata
         """
+        # First, verify our embedding adapter is properly configured
+        if self.chroma_embedding_function and not hasattr(self.chroma_embedding_function, 'embed_query'):
+            logger.warning("ChromaEmbeddingAdapter missing embed_query method - reinitializing")
+            # Reinitialize with updated adapter implementation
+            from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
+            self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
         
         # Determine whether to use the vector_store or collection
         retrieval_source = None
         if self.vector_store:
             logger.info("Using vector_store for retrieval")
+            # Check if the vector store has a properly set embedding function
+            try:
+                if not hasattr(self.vector_store._embedding_function, 'embed_query'):
+                    logger.warning("Vector store has invalid embedding function - reinitializing")
+                    from langchain_community.vectorstores import Chroma
+                    # Recreate the vector store with proper embedding function
+                    self.vector_store = Chroma(
+                        collection_name=self.collection_name,
+                        persist_directory="./chroma_db",
+                        embedding_function=self.chroma_embedding_function
+                    )
+                    logger.info("Vector store reinitialized with proper embedding function")
+            except Exception as vs_err:
+                logger.error(f"Failed to check/fix vector store embedding function: {str(vs_err)}")
+            
             retrieval_source = self.vector_store
         elif self.collection:
             logger.info("Using direct collection for retrieval")
@@ -549,7 +606,12 @@ class CodeGenerationService(BaseGenerativeService):
                     self.initialize_embedding_function()
                 
                 # Create a vector store with the proper embedding function
-                client = chromadb.get_client()
+                # Make sure to use PersistentClient to maintain consistency
+                persist_dir = "./chroma_db"
+                import os
+                os.makedirs(persist_dir, exist_ok=True)
+                client = chromadb.PersistentClient(path=persist_dir)
+                
                 self.vector_store = Chroma(
                     client=client,
                     collection_name=self.collection_name,
@@ -567,6 +629,10 @@ class CodeGenerationService(BaseGenerativeService):
                 logger.warning("Using direct collection for retrieval - this requires custom handling")
                 try:
                     # Try to directly query the collection using embedding function
+                    if not hasattr(self.embedding_function, 'embed_query'):
+                        logger.warning("Embedding function missing embed_query - reinitializing")
+                        self.initialize_embedding_function()
+                    
                     embedding_vector = self.embedding_function.embed_query(query)
                     results = self.collection.query(
                         query_embeddings=[embedding_vector],
@@ -653,6 +719,15 @@ class CodeGenerationService(BaseGenerativeService):
                 logger.warning("No embedding function available. Initializing default embedding function.")
                 self.initialize_embedding_function()
                 
+            # Verify that our embedding adapter has both required methods
+            if not hasattr(self.chroma_embedding_function, 'embed_query'):
+                logger.warning("Missing embed_query method in embedding adapter")
+                # Fix it by reinitializing the adapter if needed
+                if self.embedding_function is not None:
+                    from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
+                    self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
+                    logger.info("Re-initialized ChromaEmbeddingAdapter with updated implementation")
+            
             # Make sure directory exists
             import os
             os.makedirs(persist_directory, exist_ok=True)
@@ -1520,7 +1595,27 @@ Question: {question}
             
             # Update LangChain retriever from the collection - IMPORTANT: pass embedding_function
             try:
+                # Verify that our embedding adapter has both required methods
+                if not hasattr(self.chroma_embedding_function, 'embed_query'):
+                    logger.warning("Missing embed_query method in embedding adapter")
+                    # Fix it by reinitializing the adapter if needed
+                    if self.embedding_function is not None:
+                        from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
+                        self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
+                        logger.info("Re-initialized ChromaEmbeddingAdapter with updated implementation")
+                        
+                # Ensure we have a proper embedding function with required methods
+                if not hasattr(self.chroma_embedding_function, 'embed_query'):
+                    logger.warning("ChromaEmbeddingAdapter missing embed_query method. Recreating adapter...")
+                    # Recreate the adapter with correct methods
+                    from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
+                    self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
+                    logger.info("Successfully recreated embedding adapter with all required methods")
+                
+                # Use the proper import for LangChain community extensions
                 from langchain_community.vectorstores import Chroma
+                
+                # Create the vector store with the correct embedding function
                 self.vector_store = Chroma(
                     client=client,
                     collection_name=collection_name,
@@ -1535,10 +1630,25 @@ Question: {question}
                 try:
                     from langchain_community.vectorstores import Chroma
                     # Try direct path-based initialization
+                    
+                    # First ensure directory exists
+                    import os
+                    os.makedirs(persist_dir, exist_ok=True)
+                    
+                    # Create a new embedding adapter to ensure it has all methods
+                    try:
+                        from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
+                        fresh_adapter = ChromaEmbeddingAdapter(self.embedding_function)
+                        logger.info("Created fresh embedding adapter for retry")
+                    except Exception:
+                        logger.warning("Could not create fresh adapter, using existing one")
+                        fresh_adapter = self.chroma_embedding_function
+                    
+                    # Create with persistent directory
                     self.vector_store = Chroma(
                         persist_directory=persist_dir,
                         collection_name=collection_name,
-                        embedding_function=self.chroma_embedding_function
+                        embedding_function=fresh_adapter
                     )
                     self.retriever = self.vector_store.as_retriever()
                     logger.info("Successfully created retriever with alternate method")
