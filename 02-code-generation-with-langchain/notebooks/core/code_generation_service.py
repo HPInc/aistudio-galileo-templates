@@ -1019,7 +1019,7 @@ Question: {question}
             self.repository_chain = {
                 "context": get_formatted_context,
                 "question": RunnablePassthrough()
-            } | self.code_generation_prompt | self.llm | StrOutputParser()
+            } | self.code_description_prompt | self.llm | StrOutputParser()
             
             # Create a direct code generation chain without repository context
             logger.info("Creating direct code generation chain")
