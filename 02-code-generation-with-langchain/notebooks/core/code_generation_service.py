@@ -416,7 +416,11 @@ class CodeGenerationService(BaseGenerativeService):
             
             # Step 5: Store in vector database
             try:
-                writer = VectorStoreWriter(collection_name=self.collection_name, verbose=False)
+                writer = VectorStoreWriter(
+                    collection_name=self.collection_name,
+                    verbose=False,
+                    embedding_model=self.embedding_function
+                )
                 writer.upsert_dataframe(df)
                 logger.info(f"Repository data stored in collection: {self.collection_name}")
                 
@@ -491,7 +495,11 @@ class CodeGenerationService(BaseGenerativeService):
             } for i, item in enumerate(data)])
             
             # Store in vector database
-            writer = VectorStoreWriter(collection_name=self.collection_name, verbose=False)
+            writer = VectorStoreWriter(
+                    collection_name=self.collection_name,
+                    verbose=False,
+                    embedding_model=self.embedding_function
+                )
             writer.upsert_dataframe(df)
             
             # Update the collection reference and cache
