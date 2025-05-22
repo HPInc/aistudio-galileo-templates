@@ -136,12 +136,9 @@ class CodeGenerationService(BaseGenerativeService):
         """
         logger.info("Initializing embedding function")
         
-        # Import HuggingFaceEmbeddings
         try:
-            from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
             from langchain_huggingface import HuggingFaceEmbeddings
         except ImportError:
-            from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
             from langchain.embeddings import HuggingFaceEmbeddings
         
         # Determine which model path to use
@@ -569,7 +566,6 @@ class CodeGenerationService(BaseGenerativeService):
         if self.chroma_embedding_function and not hasattr(self.chroma_embedding_function, 'embed_query'):
             logger.warning("ChromaEmbeddingAdapter missing embed_query method - reinitializing")
             # Reinitialize with updated adapter implementation
-            from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
             self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
         
         # Determine whether to use the vector_store or collection
@@ -724,7 +720,6 @@ class CodeGenerationService(BaseGenerativeService):
                 logger.warning("Missing embed_query method in embedding adapter")
                 # Fix it by reinitializing the adapter if needed
                 if self.embedding_function is not None:
-                    from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
                     self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
                     logger.info("Re-initialized ChromaEmbeddingAdapter with updated implementation")
             
@@ -1152,7 +1147,7 @@ Question: {question}
             return pd.DataFrame([{"result": "Error: No question provided for code generation."}])
         
         try:
-            logger.info(f"Processing code generation request for question: {str(question)[:50]}...")
+            logger.info(f"Processing code generation request for question: {str(question)}...")
             logger.info(f"Parameters: metadata_only={metadata_only}, timeout={process_timeout}s, batch_size={batch_size}")
             
             # If repository_url is provided, process it first
@@ -1629,7 +1624,6 @@ Question: {question}
                     logger.warning("Missing embed_query method in embedding adapter")
                     # Fix it by reinitializing the adapter if needed
                     if self.embedding_function is not None:
-                        from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
                         self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
                         logger.info("Re-initialized ChromaEmbeddingAdapter with updated implementation")
                         
@@ -1637,7 +1631,6 @@ Question: {question}
                 if not hasattr(self.chroma_embedding_function, 'embed_query'):
                     logger.warning("ChromaEmbeddingAdapter missing embed_query method. Recreating adapter...")
                     # Recreate the adapter with correct methods
-                    from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
                     self.chroma_embedding_function = ChromaEmbeddingAdapter(self.embedding_function)
                     logger.info("Successfully recreated embedding adapter with all required methods")
                 
@@ -1648,7 +1641,7 @@ Question: {question}
                 self.vector_store = Chroma(
                     client=client,
                     collection_name=collection_name,
-                    embedding_function=self.chroma_embedding_function  # Pass the embedding function!
+                    embedding_function=self.chroma_embedding_function
                 )
                 self.retriever = self.vector_store.as_retriever()
                 logger.info(f"Updated LangChain retriever for collection: {collection_name} with embedding function")
@@ -1666,7 +1659,6 @@ Question: {question}
                     
                     # Create a new embedding adapter to ensure it has all methods
                     try:
-                        from core.chroma_embedding_adapter import ChromaEmbeddingAdapter
                         fresh_adapter = ChromaEmbeddingAdapter(self.embedding_function)
                         logger.info("Created fresh embedding adapter for retry")
                     except Exception:

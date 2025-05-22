@@ -257,8 +257,6 @@ class ChatbotService(BaseGenerativeService):
             logger.info("Creating vector database...")
             self.vectordb = Chroma.from_documents(documents=splits, embedding=self.embedding)
             
-            # We will use dynamic_retriever instead of the standard retriever
-            # The retriever attribute is kept for compatibility
             self.retriever = self.vectordb.as_retriever()
 
             logger.info("Vector database created successfully.")
