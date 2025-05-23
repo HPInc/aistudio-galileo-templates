@@ -16,7 +16,6 @@ class VectorStoreWriter:
         self.verbose = verbose
         self.embedding_model = embedding_model
         
-        # Use PersistentClient for consistency with other code
         persist_dir = "./chroma_db"
         import os
         os.makedirs(persist_dir, exist_ok=True)
@@ -58,6 +57,7 @@ class VectorStoreWriter:
                 raise ValueError(f"DataFrame must have '{col}' column")
 
         # Check for None values in embeddings and filter/replace them
+        # TODO: Investigate if this is necessary, as ChromaDB should handle None values
         default_embedding = [0.0] * 384  # Default dimension for all-MiniLM-L6-v2
         valid_indices = []
         
