@@ -83,10 +83,6 @@ class CodeGenerationService(BaseGenerativeService):
         self.embedding_function = None
         self.chroma_embedding_function = None
         
-        # Set default processing parameters
-        self.default_batch_size = 20
-        self.default_timeout = 300  # 5 minutes
-        
         # Initialize status tracker and async repository processor
         if not delay_async_init:
             self._initialize_async_components()
@@ -152,8 +148,7 @@ class CodeGenerationService(BaseGenerativeService):
             
         return self.embedding_function
     
-    def extract_repository(self, repository_url: str, metadata_only: bool = False, 
-                          batch_size: int = 10, timeout: int = 300) -> Dict[str, Any]:
+    def extract_repository(self, repository_url: str, metadata_only: bool = False) -> Dict[str, Any]:
         """
         Extract code and metadata from a GitHub repository.
         Uses a cache mechanism to avoid re-processing the same repository.
@@ -161,8 +156,6 @@ class CodeGenerationService(BaseGenerativeService):
         Args:
             repository_url: URL of the GitHub repository
             metadata_only: If True, only perform fast metadata extraction without LLM processing
-            batch_size: Number of files to process in each batch (defaults to 10 for better stability)
-            timeout: Maximum time in seconds for the entire operation
             
         Returns:
             A status dict with information about the asynchronous processing job
@@ -203,9 +196,6 @@ class CodeGenerationService(BaseGenerativeService):
             "llm_chain": self.llm if hasattr(self, 'llm') else None,
             "prompt_template": self.code_description_prompt,
             "verbose": False,
-            "item_timeout": 30,
-            "max_retries": 2,
-            "batch_size": batch_size,
             "overwrite": not metadata_only  # Only overwrite if doing full processing
         }
         
@@ -592,8 +582,6 @@ Question: {question}
                            - "question": User's code generation request (required)
                            - "repository_url": GitHub repository URL (optional)
                            - "metadata_only": Process only metadata without full LLM analysis (optional, default: False)
-                           - "process_timeout": Maximum time for repository processing in seconds (optional, default: 300)
-                           - "batch_size": Number of files to process in each batch (optional, default: 20)
             
         Returns:
             DataFrame with the generated code in a "result" column
@@ -614,8 +602,6 @@ Question: {question}
         question = ""
         repository_url = None
         metadata_only = False
-        process_timeout = 300  # Default 5 minutes
-        batch_size = 20  # Default batch size for repository processing
         
         # Extract question field (required)
         if "question" in input_data:
@@ -641,28 +627,6 @@ Question: {question}
             else:
                 metadata_only = bool(input_data["metadata_only"])
         
-        # Extract process_timeout parameter (optional)
-        if "process_timeout" in input_data:
-            try:
-                if hasattr(input_data["process_timeout"], "iloc"):
-                    process_timeout = int(input_data["process_timeout"].iloc[0]) if not input_data["process_timeout"].empty else 300
-                else:
-                    process_timeout = int(input_data["process_timeout"])
-            except (ValueError, TypeError):
-                logger.warning("Invalid process_timeout value, using default (300 seconds)")
-                process_timeout = 300
-        
-        # Extract batch_size parameter (optional)
-        if "batch_size" in input_data:
-            try:
-                if hasattr(input_data["batch_size"], "iloc"):
-                    batch_size = int(input_data["batch_size"].iloc[0]) if not input_data["batch_size"].empty else 20
-                else:
-                    batch_size = int(input_data["batch_size"])
-            except (ValueError, TypeError):
-                logger.warning("Invalid batch_size value, using default (20)")
-                batch_size = 20
-        
         # Check if question field is provided
         if not question:
             logger.warning("No question provided for code generation")
@@ -670,7 +634,7 @@ Question: {question}
         
         try:
             logger.info(f"Processing code generation request for question: {str(question)}")
-            logger.info(f"Parameters: metadata_only={metadata_only}, timeout={process_timeout}s, batch_size={batch_size}")
+            logger.info(f"Parameters: metadata_only={metadata_only}")
             
             # If repository_url is provided, process it first
             if repository_url:
@@ -681,8 +645,6 @@ Question: {question}
                     repo_response = self.extract_repository(
                         repository_url, 
                         metadata_only=metadata_only,
-                        timeout=process_timeout,
-                        batch_size=batch_size
                     )
                     processing_time = time.time() - start_time
                     
@@ -856,8 +818,6 @@ Question: {question}
             ColSpec("string", "question"),
             ColSpec("string", "repository_url", required=False),  # Optional repository URL
             ColSpec("boolean", "metadata_only", required=False),  # Optional metadata-only flag
-            ColSpec("long", "process_timeout", required=False),   # Optional process timeout in seconds
-            ColSpec("long", "batch_size", required=False)         # Optional batch size
         ])
         output_schema = Schema([
             ColSpec("string", "result")
@@ -1084,7 +1044,7 @@ Question: {question}
             # Use VectorStoreWriter for robust upsert with error handling
             logger.info(f"Upserting data to collection {collection_name}")
             vector_writer = VectorStoreWriter(collection_name=collection_name, verbose=True)
-            vector_writer.collection = self.collection  # Use our existing collection
+            vector_writer.collection = self.collection 
             vector_writer.upsert_dataframe(data_df)
             
             # Save the collection reference for later use
