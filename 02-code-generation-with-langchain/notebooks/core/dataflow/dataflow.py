@@ -89,9 +89,9 @@ class DataFrameConverter:
                 embedding = default_embedding
                 
             row = {
-                "ids": snippet.get("id", f"id_{len(outputs)}"),  # Ensure we always have an ID
-                "embeddings": embedding,  # Use the validated embedding
-                "code": snippet.get("code", ""),  # Ensure we have code (empty string if missing)
+                "ids": snippet.get("id", f"id_{len(outputs)}"), 
+                "embeddings": embedding, 
+                "code": snippet.get("code", ""), 
                 "metadatas": {
                     "filenames": snippet.get("filename", "unknown"),
                     "context": snippet.get("context", ""),

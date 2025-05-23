@@ -29,7 +29,7 @@ class AsyncRepositoryProcessor:
         processor = AsyncRepositoryProcessor()
         # Start processing in background
         processor.process_repository_async("https://github.com/username/repo")
-        # Get current status (immediately returns without blocking)
+        # Get current status
         status = processor.get_repository_status("https://github.com/username/repo")
     """
     
@@ -247,7 +247,7 @@ class AsyncRepositoryProcessor:
                     total_files=len(extracted_data)
                 )
                 
-                # Small delay to prevent excessive CPU usage
+                # Small delay to prevent excessive resources usage
                 time.sleep(0.1)
             
             # Mark processing as complete
